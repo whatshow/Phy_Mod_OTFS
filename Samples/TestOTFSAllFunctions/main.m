@@ -6,6 +6,9 @@ M_mod = 4;                                                                  % si
 M_bits = log2(M_mod);
 sympool = qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);               % Generate the symbol pool
 sympool_real = unique(real(sympool));
+SNR = 10; % dB
+%No = 1/10^(SNR/10); % linear
+No = 0;
 
 % OTFS configuration
 N = 7;                          % time slot number
@@ -21,3 +24,15 @@ x_origin = qammod(data_temp,M_mod,'gray', 'UnitAveragePower', true);
 
 % init OTFS
 otfs = OTFS(M, N);
+% modulate
+otfs.modulate(x_origin);
+% set the channel
+H_DD = otfs.setChannel(6, 11, 3);
+% pass the channel
+otfs.passChannel(No);
+% demodulate
+yDD = otfs.demodulate();
+
+% calculate the residual
+residual = sum(yDD - H_DD*x_origin, "all");
+fprintf("The residual is %.16f\n", abs(residual));
