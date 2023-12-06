@@ -12,10 +12,10 @@ classdef OTFS < handle
         r                                           % Rx value in the time domain (array)
         Y_TF                                        % Rx value in the TF domain
         Y_DD                                        % Rx value in the DD domain
-        taps_num                                    % paths number              
-        delay_taps                                  % delay index
-        doppler_taps                                % doppler index (it can be integers or fractional numbers)
-        chan_coef                                   % path gain
+        taps_num = 0                                % paths number              
+        delay_taps                                  % delay index, a row vector
+        doppler_taps                                % doppler index (integers or fractional numbers), a row vector
+        chan_coef                                   % path gain, a row vector
     end
     
     methods
@@ -52,17 +52,30 @@ classdef OTFS < handle
         end
 
         % modulate
-        % @symbols: a vector of symbols to send
+        % @symbols: a vector of symbols to send or a matrix of [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
         function modulate(self, symbols)
             % input check
-            if length(symbols) ~= self.nTimeslotNum*self.nSubcarNum
-                error("The transmission symbol number must be %d", self.nTimeslotNum*self.nSubcarNum);
+            if isvector(symbols)
+                if length(symbols) ~= self.nTimeslotNum*self.nSubcarNum
+                    error("The transmission symbol number must be %d", self.nTimeslotNum*self.nSubcarNum);
+                end
+            elseif ismatrix(symbols) 
+                [sym_row_num, sym_col_num] = size(symbols);
+                if sym_row_num ~= self.nTimeslotNum || sym_col_num ~= self.nSubcarNum
+                    error("The transmission symbol must be in the shape of (%d, %d)", self.nTimeslotNum, self.nSubcarNum);
+                end
+            else
+                error("The transmission symbol must be a vector or a matrix");
             end
             
             % modulate
             % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
-            symbols = symbols(:);
-            self.X_DD = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum)); 
+            if isvector(symbols)
+                symbols = symbols(:);
+                self.X_DD = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
+            else
+                self.X_DD = symbols;
+            end
             %self.X_DD = reshape(symbols, self.nTimeslotNum, self.nSubcarNum);
             % ISFFT 
             X_FT = fft(ifft(self.X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum);
@@ -142,6 +155,30 @@ classdef OTFS < handle
             H_DD = self.getChannel();
         end
         
+        % add a path to the channel (this does not influence other existing paths)
+        % @hi:      the path gain (linear gain)
+        % @li:      the delay
+        % @ki:      the Doppler shift
+        function addChannelPath(self, hi, li, ki)
+            if isempty(self.chan_coef)
+                self.chan_coef = hi*sqrt(1/2)*(1+1j);
+            else
+                self.chan_coef = [self.chan_coef, hi*sqrt(1/2)*(1+1j)];
+            end
+            if isempty(self.delay_taps)
+                self.delay_taps = li;
+            else
+                self.delay_taps = [self.delay_taps, li];
+            end
+            if isempty(self.doppler_taps)
+                self.doppler_taps = ki;
+            else
+                self.doppler_taps = [self.doppler_taps, ki];
+            end
+            self.taps_num = self.taps_num + 1;
+        end
+        
+        
         % pass the channel
         % @noisePow: noise power (a scalar)
         function passChannel(self, noPow)
@@ -176,7 +213,7 @@ classdef OTFS < handle
         end
         
         %% support function
-        % Get the channel matrix (using the rectangular waveform)
+        % Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
         function H_DD = getChannel(self)
             % intialize the return channel
             H_DD = zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum);
@@ -207,7 +244,31 @@ classdef OTFS < handle
             % record
             self.H_DD = H_DD;
         end
-        
+        % get the signal in the TF domain
+        function X_TF = getXTF(self)
+            X_TF = self.X_TF;
+        end
+        % get the signal in the time domain
+        function s = getS(self, varargin)
+            % Inputs Name-Value Pair 
+            inPar = inputParser;
+            addParameter(inPar,'fft_size', 0, @isnumeric);
+            inPar.KeepUnmatched = true;                                          % Allow unmatched cases
+            inPar.CaseSensitive = false;                                         % Allow capital or small characters
+            % freq_spacing & fc
+            parse(inPar, varargin{:}); 
+            fft_size = inPar.Results.fft_size;
+            
+            % if fft resolution is lower than subcarrier number, we choose the subcarrier number as the resolution
+            if fft_size < self.nSubcarNum
+                s = self.s;
+            else 
+                % Heisenberg transform
+                s_mat = ifft(self.X_TF, fft_size)*sqrt(self.nSubcarNum);
+                % vectorize
+                s = s_mat(:);
+            end
+        end
     end
 
 end
