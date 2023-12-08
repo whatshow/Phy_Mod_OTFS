@@ -13,10 +13,15 @@ No = 0;
 % OTFS configuration
 N = 9;                          % time slot number (Doppler)
 M = 11;                         % subcarrier number (Delay)
-tap_pos = [5, 6; 9, 1; 1, 11];
-delays = [1;0;1];
-Doppler = [1;1;0];
-descriptions = ["One Tap";"Doppler Overflow"; "Delay Overflow"];
+tap_pos = [5, 6; 9, 1; 1, 11; 9, 11];
+delays = [1;0;1;1];
+Doppler = [1;1;0;1];
+descriptions = ["One Tap";"Doppler Overflow"; "Delay Overflow"; "Delay Doppler Overflow"];
+
+% tap_pos = [9, 1];
+% delays = [0];
+% Doppler = [1];
+% descriptions = ["Delay Doppler Overflow"];
 
 % Generante graphs
 for id = 1:length(delays)
@@ -39,7 +44,7 @@ for id = 1:length(delays)
     % modulate
     otfs.modulate(x_origin_DD);
     % set the channel
-    otfs.addChannelPath(1, 1, 1);
+    otfs.addChannelPath(1, li, ki);
     H_DD = otfs.getChannel();
     % pass the channel
     otfs.passChannel(No);

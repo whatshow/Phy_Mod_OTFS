@@ -13,36 +13,57 @@ No = 0;
 % OTFS configuration
 N = 9;                          % time slot number
 M = 11;                         % subcarrier number
-% Gen information symbols (as a column vector)
-x_origin_DD = sqrt(1/2)*(ones(N, M) + 1j*ones(N, M));
-x_origin_DD(5-2:5+2, 6-2:6+2) = 0;
-x_origin_DD(5, 6) = sqrt(1/2)*(1 + 1j);
-x_origin = x_origin_DD.';
-x_origin = x_origin(:);
+guard_Doppler_len = [2, 2, 3];
+delays = [1, 1, 1];
+Doppler = [1, 1.43, 1.43];
+description = ["Reduced Guard(Integer Doppler)", "Reduced Guard(Fractional Doppler)", "Reduced but longer guard(Fractional Doppler)"];
 
-% init OTFS
-otfs = OTFS(M, N);
-% modulate
-otfs.modulate(x_origin_DD);
-% set the channel
-otfs.addChannelPath(1, 1, 1);
-% pass the channel
-otfs.passChannel(No);
-H_DD = otfs.getChannel();
-% demodulate
-yDD = otfs.demodulate();
-Y_DD = reshape(yDD, M, N).';
+% Gen information symbols (as a column vector
+sigs = zeros(length(description), N, M);
+sigs_X_DD = zeros(length(description), N, M);
+for id = 1:length(description)
+    hi = 1;
+    li = delays(id);
+    ki = Doppler(id);
+    gd_len = guard_Doppler_len(id);
 
-% calculate the residual
-residual = sum(yDD - H_DD*x_origin, "all");
-fprintf("The residual is %.16f\n", abs(residual));
+    x_origin_DD = sqrt(1/100)*(ones(N, M) + 1j*ones(N, M));
+    x_origin_DD(5-gd_len:5+gd_len, 6-2:6+2) = 0;
+    x_origin_DD(5, 6) = sqrt(1/2)*(1 + 1j);
+    x_origin = x_origin_DD.';
+    x_origin = x_origin(:);
+
+    % init OTFS
+    otfs = OTFS(M, N);
+    % modulate
+    otfs.modulate(x_origin_DD);
+    % set the channel
+    otfs.addChannelPath(hi, li, ki);
+    % pass the channel
+    otfs.passChannel(No);
+    H_DD = otfs.getChannel();
+    % demodulate
+    yDD = otfs.demodulate();
+    Y_DD = reshape(yDD, M, N).';
+
+    % calculate the residual
+    residual = sum(yDD - H_DD*x_origin, "all");
+    fprintf("The residual is %.16f\n", abs(residual));
+    
+    % store
+    sigs(id, :, :) = Y_DD;
+    sigs_X_DD(id, :, :) = x_origin_DD;
+end
 
 
-% plot
-figure("Name", "Reduced Guards")
-subplot(1,2,1)
-bar3(abs(x_origin_DD));
-title("Before the channel")
-subplot(1,2,2)
-bar3(abs(Y_DD));
-title("After the channel")
+%% plot
+for id = 1:length(description)
+    % plot
+    figure("Name", description(id))
+    subplot(1,2,1)
+    bar3(abs(squeeze(sigs_X_DD(id, :, :))));
+    title("Before the channel")
+    subplot(1,2,2)
+    bar3(abs(squeeze(sigs(id, :, :))));
+    title("After the channel")
+end

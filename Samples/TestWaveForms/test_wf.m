@@ -20,6 +20,7 @@ descriptions = ["Base"; "1 Doppler"; "11 Delay"];
 % generante data
 sigs = zeros(fft_size*N, length(descriptions));
 sigs_base = zeros(M*N, length(descriptions));
+sigs_X_DD = zeros(length(descriptions), N, M);
 for id = 1:length(descriptions)
     % get configuration
     tap_pos_x = tap_pos(id, 1);
@@ -27,6 +28,8 @@ for id = 1:length(descriptions)
     
     X_DD = zeros(N, M);
     X_DD(tap_pos_x, tap_pos_y) = sqrt(1/2)*(1 + 1j);
+    % store the data
+    sigs_X_DD(id, :, :) = X_DD;
     
     % init OTFS
     otfs = OTFS(M, N);
@@ -37,90 +40,52 @@ for id = 1:length(descriptions)
     sigs_base(:, id) = otfs.getS("fft_size", M);
 end
 
-%% plot (high resolution)
+
+%% plot
+% in the delay Doppler domain
+figure("Name", "Data in DD domain")
+for id = 1:length(descriptions)
+    subplot(1,length(descriptions),id);
+    bar3(abs(squeeze(sigs_X_DD(id, :, :))));
+    title(descriptions(id));
+    ylabel("Doppler");
+    xlabel("delay")
+end
+% time domain (high resolution)
 figure("Name", "Waveform (high resolution)")
 xindices = 1:fft_size:(N*fft_size+1);
-% base
-subplot(3,2,1)
-plot(real(sigs(:, 1)));
-title("Base (real)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
-subplot(3,2,2)
-plot(imag(sigs(:, 1)));
-title("Base (imag)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
-% one Doppler
-subplot(3,2,3)
-plot(real(sigs(:, 2)));
-title("1 Doppler (real)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
-subplot(3,2,4)
-plot(imag(sigs(:, 2)));
-title("1 Doppler (imag)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
-% one Delay
-subplot(3,2,5)
-plot(real(sigs(:, 3)));
-title("1 delay (real)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
-subplot(3,2,6)
-plot(imag(sigs(:, 3)));
-title("1 delay (imag)");
-grid on;
-xlim([1, N*fft_size]);
-xticks(xindices);
+for id = 1:length(descriptions)
+    subplot(length(descriptions),2,2*id-1)
+    plot(real(sigs(:, id)));
+    title(descriptions(id) + " (real)");
+    grid on;
+    xlim([1, N*fft_size]);
+    xticks(xindices);
+    subplot(length(descriptions),2,2*id)
+    plot(imag(sigs(:, id)));
+    title(descriptions(id) + " (imag)");
+    grid on;
+    xlim([1, N*fft_size]);
+    xticks(xindices);
+end
 
-% low resolution
+% time domain (low resolution)
 figure("Name", "Waveform (low resolution)")
 xindices = 1:M:(N*M+1);
 % base
-subplot(3,2,1)
-plot(real(sigs_base(:, 1)));
-title("Base (real)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
-subplot(3,2,2)
-plot(imag(sigs_base(:, 1)));
-title("Base (imag)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
-% one Doppler
-subplot(3,2,3)
-plot(real(sigs_base(:, 2)));
-title("1 Doppler (real)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
-subplot(3,2,4)
-plot(imag(sigs_base(:, 2)));
-title("1 Doppler (imag)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
-% one Delay
-subplot(3,2,5)
-plot(real(sigs_base(:, 3)));
-title("1 delay (real)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
-subplot(3,2,6)
-plot(imag(sigs_base(:, 3)));
-title("1 delay (imag)");
-grid on;
-xlim([1, N*M]);
-xticks(xindices);
+for id = 1:length(descriptions)
+    subplot(length(descriptions),2,2*id-1)
+    plot(real(sigs_base(:, id)));
+    title(descriptions(id) + " (real)");
+    grid on;
+    xlim([1, N*M]);
+    xticks(xindices);
+    subplot(length(descriptions),2,2*id)
+    plot(imag(sigs_base(:, id)));
+    title(descriptions(id) + " (imag)");
+    grid on;
+    xlim([1, N*M]);
+    xticks(xindices);
+end
 
 
