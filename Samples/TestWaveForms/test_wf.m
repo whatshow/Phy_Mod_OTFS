@@ -21,6 +21,7 @@ descriptions = ["Base"; "1 Doppler"; "11 Delay"];
 sigs = zeros(fft_size*N, length(descriptions));
 sigs_base = zeros(M*N, length(descriptions));
 sigs_X_DD = zeros(length(descriptions), N, M);
+sigs_X_DT = zeros(length(descriptions), N*M);
 for id = 1:length(descriptions)
     % get configuration
     tap_pos_x = tap_pos(id, 1);
@@ -38,6 +39,9 @@ for id = 1:length(descriptions)
     % get the symbol in the time domain
     sigs(:, id) = otfs.getS("fft_size", fft_size);
     sigs_base(:, id) = otfs.getS("fft_size", M);
+    X_DT = otfs.getXDT();
+    X_DT = X_DT(:);
+    sigs_X_DT(id, :) = X_DT;
 end
 
 
@@ -82,6 +86,24 @@ for id = 1:length(descriptions)
     xticks(xindices);
     subplot(length(descriptions),2,2*id)
     plot(imag(sigs_base(:, id)));
+    title(descriptions(id) + " (imag)");
+    grid on;
+    xlim([1, N*M]);
+    xticks(xindices);
+end
+
+% delay time domain (HD)
+figure("Name", "Waveform in delay time domain (high resolution)")
+xindices = 1:M:(N*M+1);
+for id = 1:length(descriptions)
+    subplot(length(descriptions),2,2*id-1)
+    plot(real(sigs_X_DT(id, :)));
+    title(descriptions(id) + " (real)");
+    grid on;
+    xlim([1, N*M]);
+    xticks(xindices);
+    subplot(length(descriptions),2,2*id)
+    plot(imag(sigs_X_DT(id, :)));
     title(descriptions(id) + " (imag)");
     grid on;
     xlim([1, N*M]);

@@ -244,6 +244,10 @@ classdef OTFS < handle
             % record
             self.H_DD = H_DD;
         end
+        % get the signal in the Delay Time domain [delay, time]
+        function X_DT = getXDT(self)
+            X_DT = ifft(self.X_DD).';
+        end
         % get the signal in the TF domain
         function X_TF = getXTF(self)
             X_TF = self.X_TF;
