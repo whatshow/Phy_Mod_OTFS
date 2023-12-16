@@ -37,9 +37,9 @@ for id = 1:length(descriptions)
     % modulate
     otfs.modulate(X_DD);
     % get the symbol in the time domain
-    sigs(:, id) = otfs.getS("fft_size", fft_size);
-    sigs_base(:, id) = otfs.getS("fft_size", M);
-    X_DT = otfs.getXDT();
+    sigs(:, id) = otfs.getX2T("fft_size", fft_size);
+    sigs_base(:, id) = otfs.getX2T("fft_size", M);
+    X_DT = otfs.getX2DT();
     X_DT = X_DT(:);
     sigs_X_DT(id, :) = X_DT;
 end

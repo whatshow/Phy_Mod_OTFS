@@ -101,56 +101,89 @@ classdef OTFS < handle
         end
 
         % set channel
+        % <set random paths>
         % @p: the path number
         % @lmax: the maxmimal delay index
         % @kmax: the maximal Doppler index
         % @is_fractional_doppler: whether we use the fractional Doppler (the default is false)
-        function H_DD = setChannel(self, p, lmax, kmax, varargin)
+        % <set known paths>
+        % @delays:      the delays
+        % @dopplers:    the doppler shifts
+        % @gains:       the path gains
+        function H_DD = setChannel(self, varargin)
             % Inputs Name-Value Pair 
             inPar = inputParser;
-            addParameter(inPar,'is_fractional_doppler', false, @islogical);      % register "is_fractional_doppler"
+            addParameter(inPar,'p', 0, @(x) isscalar(x)&&round(x)==x);
+            addParameter(inPar,'lmax', 0, @(x) isscalar(x)&&round(x)==x);
+            addParameter(inPar,'kmax', 0, @(x) isscalar(x)&&round(x)==x);
+            addParameter(inPar,'is_fractional_doppler', false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,'delays', [], @isnumeric);
+            addParameter(inPar,'dopplers', [], @isnumeric);
+            addParameter(inPar,'gains', [], @isnumeric);
             inPar.KeepUnmatched = true;                                          % Allow unmatched cases
             inPar.CaseSensitive = false;                                         % Allow capital or small characters
-            
             % load inputs
-            if ~isscalar(lmax)
-                error("The maximal delay index must be a scalar.");
-            elseif lmax >= self.nSubcarNum
-                error("The maximal delay index must be less than the subcarrier number.");
-            end
-            if ~isscalar(kmax)
-                error("The maximal Doppler index must be a scalar.");
-            elseif kmax > floor(self.nTimeslotNum/2)
-                error("The maximal Doppler index must be less than the half of the timeslot number")
-            end
-            if ~isscalar(p)
-                error("The path number must be a scalar.");
-            elseif p > (lmax + 1)*(2*kmax+1)
-                error("The path number must be less than lmax*(2*kmax+1) = %d", (lmax + 1)*(2*kmax+1));
-            end
-            % is fractional doppler
             parse(inPar, varargin{:});
+            p = inPar.Results.p;
+            lmax = inPar.Results.lmax;
+            kmax = inPar.Results.kmax;
             is_fractional_doppler = inPar.Results.is_fractional_doppler;
+            delays = inPar.Results.delays;
+            dopplers = inPar.Results.dopplers;
+            gains = inPar.Results.gains;
             
-            % generate paths
-            lmin= 0;
-            kmin = -kmax;
-            taps_max = (kmax - kmin + 1)*(lmax - lmin + 1);
-            % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
-            delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); 
-            % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
-            Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1);
-            % We select P paths from all possible paths; that is, we do the randperm(taps_max) and we choose the first P items
-            taps_idx_chaotic = randperm(taps_max);
-            taps_selected_idx = taps_idx_chaotic(1:p);
-            % set delay & Doppler
-            self.delay_taps = delay_taps_all(taps_selected_idx);
-            self.doppler_taps = Doppler_taps_all(taps_selected_idx);
-            % set the path gain
-            self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
-            % record path number
-            self.taps_num = p;
-            
+            % check which input we should use
+            if ~isempty(delays) && ~isempty(dopplers) && ~isempty(gains)
+                % take the assigned channels
+                delays_len = length(delays);
+                dopplers_len = length(dopplers);
+                gains_len = length(gains);
+                if ~isvector(delays) && ~isvector(dopplers) && ~isvector(gains) && (delays_len ~= dopplers_len || delays_len ~= gains_len)
+                    error("The delays, dopplers and gains do not have the same length.");
+                else
+                    self.delay_taps = delays;
+                    self.doppler_taps = dopplers;
+                    self.chan_coef = gains;
+                    self.taps_num = delays_len;
+                end
+            elseif p > 0 && lmax >= 1 && kmax > 0
+                % generate random channels
+                if p > (lmax + 1)*(2*kmax+1)
+                    error("The path number must be less than lmax*(2*kmax+1) = %d", (lmax + 1)*(2*kmax+1));
+                end
+                if lmax >= self.nSubcarNum
+                    error("The maximal delay index must be less than the subcarrier number.");
+                end
+                if kmax > floor(self.nTimeslotNum/2)
+                    error("The maximal Doppler index must be less than the half of the timeslot number");
+                end
+                lmin= 1;
+                kmin = -kmax;
+                taps_max = (kmax - kmin + 1)*(lmax - lmin + 1);
+                % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
+                delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); 
+                % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
+                Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1);
+                % add fractional Doppler
+                if is_fractional_doppler
+                    Doppler_taps_all = Doppler_taps_all + rand(1, taps_max);
+                    Doppler_taps_max = floor(self.nTimeslotNum/2);
+                    Doppler_taps_all(Doppler_taps_all > Doppler_taps_max) = Doppler_taps_max;
+                    Doppler_taps_all(Doppler_taps_all < -Doppler_taps_max) = -Doppler_taps_max;
+                end
+                % We select P paths from all possible paths; that is, we do the randperm(taps_max) and we choose the first P items
+                taps_idx_chaotic = randperm(taps_max);
+                taps_selected_idx = taps_idx_chaotic(1:p);
+                % set channel info
+                self.delay_taps = delay_taps_all(taps_selected_idx);
+                % the 1st minimal delay is 0
+                self.delay_taps(find(self.delay_taps == min(self.delay_taps), 1)) = 0;
+                self.doppler_taps = Doppler_taps_all(taps_selected_idx);
+                self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
+                self.taps_num = p;
+            else
+                error("Channel Infomation is not recognised.");
+            end
             % return the channel
             H_DD = self.getChannel();
         end
@@ -244,16 +277,23 @@ classdef OTFS < handle
             % record
             self.H_DD = H_DD;
         end
+        % get the channel delays
+        function delays = getChannelDelays(self)
+        end
+        % get the channel dopplers
+        
+        % get the channel gains
+        
         % get the signal in the Delay Time domain [delay, time]
-        function X_DT = getXDT(self)
+        function X_DT = getX2DT(self)
             X_DT = ifft(self.X_DD).';
         end
         % get the signal in the TF domain
-        function X_TF = getXTF(self)
+        function X_TF = getX2TF(self)
             X_TF = self.X_TF;
         end
         % get the signal in the time domain
-        function s = getS(self, varargin)
+        function s = getX2T(self, varargin)
             % Inputs Name-Value Pair 
             inPar = inputParser;
             addParameter(inPar,'fft_size', 0, @isnumeric);

@@ -27,7 +27,7 @@ otfs = OTFS(M, N);
 % modulate
 otfs.modulate(x_origin);
 % set the channel
-H_DD = otfs.setChannel(6, 11, 3);
+H_DD = otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
 % pass the channel
 otfs.passChannel(No);
 % demodulate
