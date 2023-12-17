@@ -279,10 +279,16 @@ classdef OTFS < handle
         end
         % get the channel delays
         function delays = getChannelDelays(self)
+            delays = self.delay_taps;
         end
         % get the channel dopplers
-        
+        function dopplers = getChannelDopplers(self)
+            dopplers = self.doppler_taps;
+        end
         % get the channel gains
+        function gains = getChannelGains(self)
+            gains = self.chan_coef;
+        end
         
         % get the signal in the Delay Time domain [delay, time]
         function X_DT = getX2DT(self)
