@@ -194,9 +194,9 @@ classdef OTFS < handle
         % @ki:      the Doppler shift
         function addChannelPath(self, hi, li, ki)
             if isempty(self.chan_coef)
-                self.chan_coef = hi*sqrt(1/2)*(1+1j);
+                self.chan_coef = hi;
             else
-                self.chan_coef = [self.chan_coef, hi*sqrt(1/2)*(1+1j)];
+                self.chan_coef = [self.chan_coef, hi];
             end
             if isempty(self.delay_taps)
                 self.delay_taps = li;
