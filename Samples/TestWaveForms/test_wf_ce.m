@@ -33,13 +33,6 @@ otfs.passChannel(0);
 yDD = otfs.demodulate();
 Y_DD = reshape(yDD, M, N).';
 
-% calculate the residual
-residual = sum(yDD - H_DD*x_origin, "all");
-residual_max = max(abs(yDD - H_DD*x_origin), [], "all");
-fprintf("The residual is %.16f\n", abs(residual));
-fprintf("The max residual is %.16f\n", residual_max);
-
-
 x = x_origin_DD(tap_pos_x, tap_pos_y);
 y = Y_DD(tap_pos_x + ki, tap_pos_y + li);
 gains = otfs.getChannelGains();
@@ -63,6 +56,13 @@ y_est2 = h_est2*x*exp(-1j*2*pi*li*ki/N/M);
 y_est3 = h_est3*x*exp(-1j*2*pi*li*ki/N/M);
 y_est4 = h_est4*x*exp(-1j*2*pi*li*ki/N/M);
 y_est5 = h_est5*x*exp(-1j*2*pi*li*ki/N/M);
+y_est6 = h_est6*x*exp(1j*2*pi*ki*(tap_pos_y-1)/(M*N));
+
+
+% calculate the residual
+fprintf("The channel phase equation is 2*pi*ki*(l-li)/M/N");
+residual = abs(sum(y_est6 - y, "all"));
+fprintf("The residual is %.16f\n", abs(residual));
 
 % figure(1)
 % subplot(2,2,1);
