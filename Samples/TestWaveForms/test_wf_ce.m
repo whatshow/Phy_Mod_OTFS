@@ -64,6 +64,14 @@ fprintf("The channel phase equation is 2*pi*ki*(l-li)/M/N");
 residual = abs(sum(y_est6 - y, "all"));
 fprintf("The residual is %.16f\n", abs(residual));
 
+otfs_ce = OTFS(M, N);
+otfs_ce.addChannelPath(h_est6, li, ki);
+H_DD_ce = otfs_ce.getChannel();
+
+fprintf("The channel phase equation is 2*pi*ki*(l-li)/M/N");
+residual_H_DD = abs(sum(H_DD_ce - H_DD, "all"));
+fprintf("The residual(H_DD) is %.16f\n", abs(residual));
+
 % figure(1)
 % subplot(2,2,1);
 % bar3(real(x_origin_DD));
@@ -87,4 +95,4 @@ bar3(abs(Y_DD));
 title("Y");
 
 
-clear Y_DD yDD H_DD;
+clear Y_DD yDD;

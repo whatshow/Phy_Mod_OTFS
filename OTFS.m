@@ -106,6 +106,7 @@ classdef OTFS < handle
         % @lmax: the maxmimal delay index
         % @kmax: the maximal Doppler index
         % @is_fractional_doppler: whether we use the fractional Doppler (the default is false)
+        % @frac_doppler_max: the maximal Doppler index, kmax = floor(frac_dop_max) 
         % <set known paths>
         % @delays:      the delays
         % @dopplers:    the doppler shifts
@@ -117,6 +118,7 @@ classdef OTFS < handle
             addParameter(inPar,'lmax', 0, @(x) isscalar(x)&&round(x)==x);
             addParameter(inPar,'kmax', 0, @(x) isscalar(x)&&round(x)==x);
             addParameter(inPar,'is_fractional_doppler', false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,'frac_doppler_max', 0, @(x) isscalar(x)&&isnumeric(x));
             addParameter(inPar,'delays', [], @isnumeric);
             addParameter(inPar,'dopplers', [], @isnumeric);
             addParameter(inPar,'gains', [], @isnumeric);
@@ -128,6 +130,7 @@ classdef OTFS < handle
             lmax = inPar.Results.lmax;
             kmax = inPar.Results.kmax;
             is_fractional_doppler = inPar.Results.is_fractional_doppler;
+            frac_doppler_max = inPar.Results.frac_doppler_max;
             delays = inPar.Results.delays;
             dopplers = inPar.Results.dopplers;
             gains = inPar.Results.gains;
@@ -148,11 +151,16 @@ classdef OTFS < handle
                 end
             elseif p > 0 && lmax >= 1 && kmax > 0
                 % generate random channels
+                % input check
                 if p > (lmax + 1)*(2*kmax+1)
                     error("The path number must be less than lmax*(2*kmax+1) = %d", (lmax + 1)*(2*kmax+1));
                 end
                 if lmax >= self.nSubcarNum
                     error("The maximal delay index must be less than the subcarrier number.");
+                end
+                % input check - update kmax if using fractional Doppler
+                if is_fractional_doppler
+                    kmax = floor(frac_doppler_max);
                 end
                 if kmax > floor(self.nTimeslotNum/2)
                     error("The maximal Doppler index must be less than the half of the timeslot number");
