@@ -34,16 +34,16 @@ classdef OTFS < handle
             
             % take inputs
             % nSubcarNum  
-            if isscalar(nSubcarNum) 
-                self.nSubcarNum = nSubcarNum;
+            if ~isscalar(nSubcarNum) || nSubcarNum ~= floor(nSubcarNum)
+                error("The number of subcarriers must be an integer scalar.");
             else
-                error("The number of subcarriers must be a scalar.");
+                self.nSubcarNum = nSubcarNum;
             end
             % nSubcarNum
-            if isscalar(nTimeslotNum)
-                self.nTimeslotNum = nTimeslotNum;
+            if ~isscalar(nTimeslotNum) || nTimeslotNum ~= floor(nTimeslotNum)
+                error("The number of timeslots must be an integer scalar.");
             else
-                error("The number of timeslots must be a scalar.");
+                self.nTimeslotNum = nTimeslotNum;
             end
             % freq_spacing & fc
             parse(inPar, varargin{:}); 
@@ -105,8 +105,7 @@ classdef OTFS < handle
         % @p: the path number
         % @lmax: the maxmimal delay index
         % @kmax: the maximal Doppler index
-        % @is_fractional_doppler: whether we use the fractional Doppler (the default is false)
-        % @frac_doppler_max: the maximal Doppler index, kmax = floor(frac_dop_max) 
+        % @kmax_frac: the maximal fractional Doppler index. If set, using fractional Doppler and kmax = floor(frac_dop_max)
         % <set known paths>
         % @delays:      the delays
         % @dopplers:    the doppler shifts
@@ -117,8 +116,7 @@ classdef OTFS < handle
             addParameter(inPar,'p', 0, @(x) isscalar(x)&&round(x)==x);
             addParameter(inPar,'lmax', 0, @(x) isscalar(x)&&round(x)==x);
             addParameter(inPar,'kmax', 0, @(x) isscalar(x)&&round(x)==x);
-            addParameter(inPar,'is_fractional_doppler', false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar,'frac_doppler_max', 0, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar,'kmax_frac', [], @(x) isscalar(x)&&isnumeric(x));
             addParameter(inPar,'delays', [], @isnumeric);
             addParameter(inPar,'dopplers', [], @isnumeric);
             addParameter(inPar,'gains', [], @isnumeric);
@@ -129,8 +127,12 @@ classdef OTFS < handle
             p = inPar.Results.p;
             lmax = inPar.Results.lmax;
             kmax = inPar.Results.kmax;
-            is_fractional_doppler = inPar.Results.is_fractional_doppler;
-            frac_doppler_max = inPar.Results.frac_doppler_max;
+            kmax_frac = inPar.Results.kmax_frac;
+            is_fractional_doppler = false;
+            if ~isempty(kmax_frac)
+                is_fractional_doppler = true;
+                kmax = floor(kmax_frac);
+            end
             delays = inPar.Results.delays;
             dopplers = inPar.Results.dopplers;
             gains = inPar.Results.gains;
@@ -149,7 +151,7 @@ classdef OTFS < handle
                     self.chan_coef = gains;
                     self.taps_num = delays_len;
                 end
-            elseif p > 0 && lmax >= 1 && kmax > 0
+            elseif p > 0 && lmax >= 1 && (kmax > 0 || kmax_frac > 0)
                 % generate random channels
                 % input check
                 if p > (lmax + 1)*(2*kmax+1)
@@ -159,11 +161,14 @@ classdef OTFS < handle
                     error("The maximal delay index must be less than the subcarrier number.");
                 end
                 % input check - update kmax if using fractional Doppler
-                if is_fractional_doppler
-                    kmax = floor(frac_doppler_max);
-                end
-                if kmax > floor(self.nTimeslotNum/2)
-                    error("The maximal Doppler index must be less than the half of the timeslot number");
+                if ~is_fractional_doppler
+                    if kmax > floor(self.nTimeslotNum/2)
+                        error("The maximal Doppler index must be less than the half of the timeslot number");
+                    end
+                else
+                    if kmax_frac > floor(self.nTimeslotNum/2)
+                        error("The maximal fractional Doppler index must be less than the half of the timeslot number");
+                    end
                 end
                 lmin= 1;
                 kmin = -kmax;
@@ -174,10 +179,12 @@ classdef OTFS < handle
                 Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1);
                 % add fractional Doppler
                 if is_fractional_doppler
-                    Doppler_taps_all = Doppler_taps_all + rand(1, taps_max);
-                    Doppler_taps_max = floor(self.nTimeslotNum/2);
-                    Doppler_taps_all(Doppler_taps_all > Doppler_taps_max) = Doppler_taps_max;
-                    Doppler_taps_all(Doppler_taps_all < -Doppler_taps_max) = -Doppler_taps_max;
+                    Doppler_taps_all_k_max_idx = Doppler_taps_all == kmax;
+                    Doppler_taps_all_k_others_idx = Doppler_taps_all ~=kmax;
+                    frac_range_max = rand(1, taps_max)*(kmax_frac - kmax + 0.5) - (kmax_frac - kmax + 0.5)/2;
+                    frac_range_others = rand(1, taps_max) - 0.5;
+                    frac_range_all = frac_range_max.*Doppler_taps_all_k_max_idx + frac_range_others.*Doppler_taps_all_k_others_idx;
+                    Doppler_taps_all = Doppler_taps_all + frac_range_all;
                 end
                 % We select P paths from all possible paths; that is, we do the randperm(taps_max) and we choose the first P items
                 taps_idx_chaotic = randperm(taps_max);

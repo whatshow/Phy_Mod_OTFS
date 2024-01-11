@@ -13,8 +13,12 @@ from numpy.random import default_rng
 #        • set_transmission_symbols:                 
 class OTFS(object):
     # constants
-    FREQ_SPACING = 15;
-    FC = 3;
+    FREQ_SPACING = 15;                          # default frequency spacing is 15kHz
+    FC = 3;                                     # default single carrier frequency is 3GHz
+    BATCH_SIZE = -1;
+    
+    # batch
+    batch_size = None;                          # the mini batch
     
     # variables
     nSubcarNum = None;                          # subcarrier number
@@ -34,13 +38,34 @@ class OTFS(object):
     doppler_taps = None;                        # doppler index (integers or fractional numbers), a row vector
     chan_coef = None;                           # path gain, a row vector
     
+    '''
+    constructor
+    @nSubcarNum:      subcarrier number
+    @nTimeslotNum:    timeslot number
+    @freq_spacing:    frequency spacing (kHz), the default is 15kHz
+    @fc:              single carrier frequency (GHz), the default is 3GHz
+    '''
+    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=FREQ_SPACING, fc=FC, batch_size = BATCH_SIZE):
+        if not isinstance(nSubcarNum, int):
+            raise Exception("The number of subcarriers must be an integer scalar.");
+        else:
+            self.nSubcarNum = nSubcarNum;
+        if not isinstance(nTimeslotNum, int):
+            raise Exception("The number of timeslots must be an integer scalar.");
+        else:
+            self.nTimeslotNum = nTimeslotNum;
+        self.freq_spacing = freq_spacing;
+        self.fc = fc;
+        self.batch_size = batch_size;
     
-    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=FREQ_SPACING, fc=FC):
-        pass
-    
-    
-    def modulate(self):
-        pass
+    '''
+    modulate
+    @symbols: a vector of symbols to send or a matrix of [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
+    '''
+    def modulate(self, symbols):
+        # input check
+        symbols = np.asarray(symbols);
+        
     
     def demodulate(self):
         pass
