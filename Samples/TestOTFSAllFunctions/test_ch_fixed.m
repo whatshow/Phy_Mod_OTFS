@@ -18,8 +18,7 @@ N_bits_perfram = N*M*M_bits;    % number of bits per frame
 
 
 % Gen information symbols (as a column vector)
-data_info_bit = randi([0,1],N_bits_perfram,1);
-data_temp = bi2de(reshape(data_info_bit,N_syms_perfram,M_bits));
+data_temp = [3;3;2;3;0;2;2;0;1;2;1;1;3;3;2;0;3;0;2;0;3;2;1;0;2;0;2;3;3;2;3;2;0;1;3;1;2;1;3;3;1;0;0;1;2;2;0;1;3;1;3;1;3;0;2;1;1;3;3;1;2;0;3;2;3;1;2;2;1;1;1;1;2;1;2;3;1;3;0;3;1;2;0;3];
 x_origin = qammod(data_temp,M_mod,'gray', 'UnitAveragePower', true);
 
 % init OTFS

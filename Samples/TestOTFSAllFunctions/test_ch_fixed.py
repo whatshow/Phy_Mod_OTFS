@@ -47,7 +47,3 @@ s_mat = np.squeeze(s_mat);
 s = otfs.s;
 residual_s = np.sum(abs(s_mat - s), axis=None);
 print("X_TF residual is %.16f"%residual_s);
-
-
-# set the channel
-H_DD = otfs.setChannel(p=6, lmax=11, kmax=3);
