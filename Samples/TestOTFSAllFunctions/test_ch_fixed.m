@@ -11,14 +11,14 @@ SNR = 10; % dB
 No = 0;
 
 % OTFS configuration
-N = 7;                          % time slot number
-M = 12;                         % subcarrier number
+N = 4;                          % time slot number
+M = 4;                         % subcarrier number
 N_syms_perfram = N*M;           % number of symbols per frame
 N_bits_perfram = N*M*M_bits;    % number of bits per frame
 
 
 % Gen information symbols (as a column vector)
-data_temp = [3;3;2;3;0;2;2;0;1;2;1;1;3;3;2;0;3;0;2;0;3;2;1;0;2;0;2;3;3;2;3;2;0;1;3;1;2;1;3;3;1;0;0;1;2;2;0;1;3;1;3;1;3;0;2;1;1;3;3;1;2;0;3;2;3;1;2;2;1;1;1;1;2;1;2;3;1;3;0;3;1;2;0;3];
+data_temp = [3;3;2;3;0;2;2;0;1;2;1;1;3;3;2;0];
 x_origin = qammod(data_temp,M_mod,'gray', 'UnitAveragePower', true);
 
 % init OTFS
@@ -28,7 +28,7 @@ otfs.modulate(x_origin);
 % set the channel
 H_DD = otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
 % pass the channel
-otfs.passChannel(No);
+r = otfs.passChannel(No);
 % demodulate
 yDD = otfs.demodulate();
 
