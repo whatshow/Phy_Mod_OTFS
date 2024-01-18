@@ -177,23 +177,22 @@ classdef OTFS < handle
                 delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); 
                 % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
                 Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1);
-                % add fractional Doppler
-                if is_fractional_doppler
-                    Doppler_taps_all_k_max_idx = Doppler_taps_all == kmax;
-                    Doppler_taps_all_k_others_idx = Doppler_taps_all ~=kmax;
-                    frac_range_max = rand(1, taps_max)*(kmax_frac - kmax + 0.5) - (kmax_frac - kmax + 0.5)/2;
-                    frac_range_others = rand(1, taps_max) - 0.5;
-                    frac_range_all = frac_range_max.*Doppler_taps_all_k_max_idx + frac_range_others.*Doppler_taps_all_k_others_idx;
-                    Doppler_taps_all = Doppler_taps_all + frac_range_all;
-                end
                 % We select P paths from all possible paths; that is, we do the randperm(taps_max) and we choose the first P items
-                taps_idx_chaotic = randperm(taps_max);
-                taps_selected_idx = taps_idx_chaotic(1:p);
+                taps_selected_idx = Channl_SelectRandomPathIdx(taps_max, p);
                 % set channel info
                 self.delay_taps = delay_taps_all(taps_selected_idx);
                 % the 1st minimal delay is 0
                 self.delay_taps(find(self.delay_taps == min(self.delay_taps), 1)) = 0;
                 self.doppler_taps = Doppler_taps_all(taps_selected_idx);
+                % add fractional Doppler
+                if is_fractional_doppler
+                    doppler_taps_k_max_idx = abs(self.doppler_taps) == kmax;
+                    doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
+                    frac_range_max = rand(1, p)*(kmax_frac - kmax + 0.5) - (kmax_frac - kmax + 0.5)/2;
+                    frac_range_others = rand(1, p) - 0.5;
+                    frac_range_all = frac_range_max.*doppler_taps_k_max_idx + frac_range_others.*doppler_taps_k_other_idx;
+                    self.doppler_taps = self.doppler_taps + frac_range_all;
+                end
                 self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
                 self.taps_num = p;
             else
@@ -229,14 +228,14 @@ classdef OTFS < handle
         
         % pass the channel
         % @noisePow: noise power (a scalar)
-        function passChannel(self, noPow)
+        function r = passChannel(self, noPow)
             % input check
             if ~isscalar(noPow)
                 error("The noise power must be a scalar.");
             end
             % add CP
             cp_len = max(self.delay_taps);
-            s_cp = [self.s(self.nTimeslotNum*self.nSubcarNum - cp_len + 1 : self.nTimeslotNum*self.nSubcarNum);self.s];
+            s_cp = Channel_AddCP(self.s, cp_len);
             % pass the channel
             s_chan = 0;
             for tap_id = 1:self.taps_num
@@ -258,6 +257,8 @@ classdef OTFS < handle
             end
             % remove CP
             self.r = self.r(cp_len+1:cp_len+(self.nTimeslotNum*self.nSubcarNum));
+            % return
+            r = self.r;
         end
         
         %% support function
@@ -335,5 +336,20 @@ classdef OTFS < handle
             end
         end
     end
+end
 
+% select p random path indices from given paths
+% @taps_max: the maximal path number
+% @p: the path number we select
+function taps_selected_idx = Channl_SelectRandomPathIdx(taps_max, p)
+    taps_idx_chaotic = randperm(taps_max);
+    taps_selected_idx = taps_idx_chaotic(1:p);
+end
+
+% add cyclic prefix
+% @s: time domain signal
+% @cp_len: the cyclic prefix length
+function s_cp = Channel_AddCP(s, cp_len)
+    syms_len = length(s);
+    s_cp = [s(syms_len - cp_len + 1 : syms_len);s];
 end
