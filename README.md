@@ -1,5 +1,5 @@
-# Mod_OTFS
-OTFS modulation
+# OTFS modulation
+This repositiory is a foundamental toolbox of OTFS modulation crossing `matlab` and `python`.
 
 * **In another local repositiory, add this module**
 ```sh
