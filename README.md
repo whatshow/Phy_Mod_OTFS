@@ -83,6 +83,10 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
     * return value: the channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
 * passChannel<br>
     `@No`: a scalar of the linear noise power
+    ```python
+    # matlab & python
+    otfs.passChannel(No);
+    ```
 * demodulate<br>
     * return value: the vectorized received signal in the delay Doppler domain, a vector of [(batch_size), nSubcarNum*nTimeslotNum]
     ```python
