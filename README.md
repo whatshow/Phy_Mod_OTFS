@@ -94,7 +94,7 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
     yDD = otfs.demodulate();
     ```
 ## Samples
-Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require `init` first to load directories.
+Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * TestFractionalDoppler
 * TestOTFSAllFunctions: test all functions using random channels and fixed channels
 * TestWaveForms
