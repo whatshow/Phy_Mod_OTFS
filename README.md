@@ -55,8 +55,7 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
         If we use `batch`, the channel will be different for each sample in the batch.
         `@p`: the path number (scalar)<br>
         `@lmax`: the maximal integer delay index (scalar)<br>
-        `@kmax`: the maximal integer Doppler index (scalar)<br>
-        `@kmax_frac`: the maximal float Doppler index (scalar). If set, `kmax` will be forced to set to`floor(kmax_frac)`<br>
+        `@kmax`: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler<br>
         ```matlab
         % matlab
         H_DD = otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);

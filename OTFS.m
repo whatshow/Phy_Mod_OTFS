@@ -104,8 +104,7 @@ classdef OTFS < handle
         % <set random paths>
         % @p: the path number
         % @lmax: the maxmimal delay index
-        % @kmax: the maximal Doppler index
-        % @kmax_frac: the maximal fractional Doppler index. If set, using fractional Doppler and kmax = floor(frac_dop_max)
+        % @kmax: the maximal Doppler index (can be fractional)
         % <set known paths>
         % @delays:      the delays
         % @dopplers:    the doppler shifts
@@ -115,8 +114,7 @@ classdef OTFS < handle
             inPar = inputParser;
             addParameter(inPar,'p', 0, @(x) isscalar(x)&&round(x)==x);
             addParameter(inPar,'lmax', 0, @(x) isscalar(x)&&round(x)==x);
-            addParameter(inPar,'kmax', 0, @(x) isscalar(x)&&round(x)==x);
-            addParameter(inPar,'kmax_frac', [], @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar,'kmax', 0, @isscalar);
             addParameter(inPar,'delays', [], @isnumeric);
             addParameter(inPar,'dopplers', [], @isnumeric);
             addParameter(inPar,'gains', [], @isnumeric);
@@ -127,11 +125,12 @@ classdef OTFS < handle
             p = inPar.Results.p;
             lmax = inPar.Results.lmax;
             kmax = inPar.Results.kmax;
-            kmax_frac = inPar.Results.kmax_frac;
+            kmax_frac = 0;
             is_fractional_doppler = false;
-            if ~isempty(kmax_frac)
+            if kmax ~= floor(kmax)
                 is_fractional_doppler = true;
-                kmax = floor(kmax_frac);
+                kmax_frac = kmax;
+                kmax = floor(kmax);
             end
             delays = inPar.Results.delays;
             dopplers = inPar.Results.dopplers;
@@ -186,11 +185,13 @@ classdef OTFS < handle
                 self.doppler_taps = Doppler_taps_all(taps_selected_idx);
                 % add fractional Doppler
                 if is_fractional_doppler
-                    doppler_taps_k_max_idx = abs(self.doppler_taps) == kmax;
+                    doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
+                    doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                     doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
-                    frac_range_max = rand(1, p)*(kmax_frac - kmax + 0.5) - (kmax_frac - kmax + 0.5)/2;
+                    frac_range_max_pos = rand(1, p)*(kmax_frac - kmax + 0.5) - 0.5;
+                    frac_range_max_neg = rand(1, p)*(kmax - kmax_frac - 0.5) + 0.5;
                     frac_range_others = rand(1, p) - 0.5;
-                    frac_range_all = frac_range_max.*doppler_taps_k_max_idx + frac_range_others.*doppler_taps_k_other_idx;
+                    frac_range_all = frac_range_max_pos.*doppler_taps_k_max_pos_idx + frac_range_max_neg.*doppler_taps_k_max_neg_idx + frac_range_others.*doppler_taps_k_other_idx;
                     self.doppler_taps = self.doppler_taps + frac_range_all;
                 end
                 self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));

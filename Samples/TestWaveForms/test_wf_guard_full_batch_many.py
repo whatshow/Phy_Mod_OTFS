@@ -5,7 +5,7 @@ import sys
 sys.path.append("..") 
 from OTFS import OTFS;
 
-batch_size = 1;
+batch_size = 2;
 
 # QAM configuration
 sympool = np.asarray([-0.707106781186548+0.707106781186548j, -0.707106781186548-0.707106781186548j,0.707106781186548+0.707106781186548j,0.707106781186548-0.707106781186548j]);
@@ -64,7 +64,7 @@ for des_id in range(len(description)):
     
 # plot
 for des_id in range(len(description)):
-    fig = plt.figure(des_id, figsize=(8, 3*batch_size), constrained_layout=True); # constrained_layout avoid overlapping titles
+    fig = plt.figure(des_id, figsize=(8, (1+7*batch_size)), constrained_layout=True); # constrained_layout avoid overlapping titles
     fig.suptitle(description[des_id]);
     figure_size = batch_size*100+22;
     for batch_id in range(batch_size):

@@ -106,23 +106,20 @@ class OTFS(object):
     <set random paths>
     @p: the path number
     @lmax: the maxmimal delay index
-    @kmax: the maximal Doppler index
-    @kmax_frac: the maximal fractional Doppler index. If set, using fractional Doppler and kmax = floor(frac_dop_max)
+    @kmax: the maximal Doppler index (can be fractional)
     <set known paths>
     @delays:      the delays
     @dopplers:    the doppler shifts
     @gains:       the path gains
     '''
-    def setChannel(self, *, p=0, lmax=0, kmax=0, kmax_frac=0.0, delays=[], dopplers=[], gains=[]):
+    def setChannel(self, *, p=0, lmax=0, kmax=0, delays=[], dopplers=[], gains=[]):
         # input check
         if not isinstance(p, int):
             raise Exception("p must be an integer");
         elif not isinstance(lmax, int):
             raise Exception("lmax must be an integer");
-        elif not isinstance(kmax, int):
-            raise Exception("kmax must be an integer");
-        elif not isinstance(kmax_frac, float):
-            raise Exception("kmax_frac must be a float");
+        elif not isinstance(kmax, (int, float)):
+            raise Exception("kmax must be an integer or a float number");
         delays = np.asarray(delays);
         if not isinstance(delays, np.ndarray) and (delays.ndim == 1 and self.batch_size == OTFS.BATCH_SIZE_NO or delays.ndim == 2 and self.batch_size != OTFS.BATCH_SIZE_NO):
             raise Exception("delays must be a list");
@@ -137,11 +134,11 @@ class OTFS(object):
         
         # reset paramets if using fractional Doppler
         is_fractional_doppler = False;
-        if kmax_frac > 0:
+        kmax_frac = 0.0;
+        if kmax != np.floor(kmax):
             is_fractional_doppler = True;
-            kmax = np.floor(kmax_frac);
-        # channel data shape
-        ch_data_shape = (p) if self.batch_size ==  OTFS.BATCH_SIZE_NO else (self.batch_size, p);
+            kmax_frac = kmax;
+            kmax = np.floor(kmax_frac).astype(int);
         
         # set the channel
         if delays.size != 0 and dopplers.size != 0 and gains.size != 0:
@@ -169,13 +166,15 @@ class OTFS(object):
             self.doppler_taps = np.take(k_combs, taps_selected_idx);
             # append fractional Doppler
             if is_fractional_doppler:
-                doppler_taps_k_max_idx = abs(self.doppler_taps == kmax);
+                doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
+                doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                 doppler_taps_k_other_idx = abs(self.doppler_taps) != kmax;
-                frac_range_max = np.random.rand(ch_data_shape)*(kmax_frac - kmax + 0.5) - (kmax_frac - kmax + 0.5)/2;
-                frac_range_others = np.random.rand(ch_data_shape) - 0.5;
-                frac_range_all = frac_range_max*doppler_taps_k_max_idx + frac_range_others*doppler_taps_k_other_idx;
+                frac_range_max_pos = self.rand(p)*(kmax_frac - kmax + 0.5) - 0.5;
+                frac_range_max_neg = self.rand(p)*(kmax - kmax_frac - 0.5) + 0.5;
+                frac_range_others = self.rand(p) - 0.5;
+                frac_range_all = frac_range_max_pos*doppler_taps_k_max_pos_idx + frac_range_max_neg*doppler_taps_k_max_neg_idx + frac_range_others*doppler_taps_k_other_idx;
                 self.doppler_taps = self.doppler_taps + frac_range_all;
-            self.chan_coef = np.sqrt(1/p)*np.sqrt(1/2)*np.random.randn(p) + 1j*np.random.randn(p) if self.batch_size ==  OTFS.BATCH_SIZE_NO else np.sqrt(1/p)*np.sqrt(1/2)*np.random.randn(self.batch_size, p) + 1j*np.random.randn(self.batch_size, p);
+            self.chan_coef = np.sqrt(1/p)*np.sqrt(1/2)*self.randn(p) + 1j*self.randn(p);
             self.taps_num = p;
         else:
             raise Exception("Channel Infomation is not recognised.");
@@ -227,7 +226,7 @@ class OTFS(object):
             s_chan = s_chan + cur_s_tmp;
         # add noise
         if noPow >= 0:
-            noise = np.sqrt(noPow/2)*(np.random.randn(s_chan.shape[-1]) + 1j*np.random.randn(s_chan.shape[-1])) if self.batch_size == OTFS.BATCH_SIZE_NO else np.sqrt(noPow/2)*(np.random.randn(self.batch_size, s_chan.shape[-1]) + 1j*np.random.randn(self.batch_size, s_chan.shape[-1]));
+            noise = np.sqrt(noPow/2)*(self.randn(s_chan.shape[-1]) + 1j*self.randn(s_chan.shape[-1]));
             self.r = s_chan + noise;
         else:
             self.r = s_chan;
@@ -321,10 +320,30 @@ class OTFS(object):
             s_mat = np.fft.ifft(self.X_TF, n=fft_size, axis=-2)*np.sqrt(self.nSubcarNum);
             # vectorize
             s = reshape(s_mat, self.nSubcarNum*self.nTimeslotNum, batch_size=self.batch_size, order='F');
-            
         return s;
-
-
+    
+    ##########################################################################
+    # Functions uniform with non-batch and batch
+    ##########################################################################
+    '''
+    generate random values from [0, 1) following a uniform distribution
+    @args: d0, d1, ..., dn (multiple inputs)
+    '''
+    def rand(self, *args):
+        if self.batch_size is OTFS.BATCH_SIZE_NO:
+            return np.random.rand(*args);
+        else:
+            return np.random.rand(self.batch_size, *args);
+    '''
+    generate random values following the standard normal distribution 
+    @args: d0, d1, ..., dn (multiple inputs)
+    '''
+    def randn(self, *args):
+        if self.batch_size is OTFS.BATCH_SIZE_NO:
+            return np.random.randn(*args);
+        else:
+            return np.random.randn(self.batch_size, *args);
+        
 
 ##############################################################################
 # Support Functions (only used in this model, please don't import)

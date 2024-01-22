@@ -14,7 +14,6 @@ N = 9;                          % time slot number
 M = 11;                         % subcarrier number
 p = 1;
 lmax = 2;
-DopplerTag = ["kmax", "kmax_frac"];
 DopplerValue = [2, 3.6];
 description = ["Integer Doppler", "Fractional Doppler"];
 
@@ -34,7 +33,7 @@ for id = 1:length(description)
     % modulate
     otfs.modulate(x_origin_DD);
     % set the channel
-    H_DD = otfs.setChannel("p", p, DopplerTag(id), DopplerValue(id), "lmax", lmax);
+    H_DD = otfs.setChannel("p", p, "kmax", DopplerValue(id), "lmax", lmax);
     dopplers = otfs.getChannelDopplers();
     sigs_dopplers(id) = dopplers;
     % pass the channel

@@ -5,36 +5,29 @@ import sys
 sys.path.append("..") 
 from OTFS import OTFS;
 
-batch_size = 1;
-
 # QAM configuration
 sympool = np.asarray([-0.707106781186548+0.707106781186548j, -0.707106781186548-0.707106781186548j,0.707106781186548+0.707106781186548j,0.707106781186548-0.707106781186548j]);
 SNR = 10; # dB
-#No = 1/10^(SNR/10); # linear
 No = 0;
+
 
 # OTFS configuration
 N = 9;                          # time slot number
 M = 11;                         # subcarrier number
-delays = [1, 1];
-Doppler = [1, 1.43];
-description = ["Full Guards(Integer Doppler)", "Full Guards(Fractional Doppler)"];
+p = 1;
+lmax = 2;
+DopplerTag = ["kmax", "kmax_frac"];
+DopplerValue = [2, 3.6];
+description = ["Integer Doppler", "Fractional Doppler"];
 
+# batch
+batch_size = 1;
 
-## Gen information symbols (as a column vector)
-sigs = np.zeros((len(description), batch_size, N, M), dtype=np.complex128);
+# Gen information symbols (as a column vector)
+sigs =  np.zeros((len(description), batch_size, N, M), dtype=np.complex128);
 sigs_X_DD = np.zeros((len(description), batch_size, N, M), dtype=np.complex128);
-
-
+sigs_dopplers = [0, 0];
 for des_id in range(len(description)):
-    hi = 1;
-    li = delays[des_id];
-    ki = Doppler[des_id];
-    
-    hi = np.tile(hi, (batch_size, 1));
-    li = np.tile(li, (batch_size, 1));
-    ki = np.tile(ki, (batch_size, 1));
-    
     x_origin_DD = np.sqrt(1/100)*(np.ones((N, M)) + 1j*np.ones((N, M)));
     x_origin_DD[:, 5-2:5+2+1] = 0;
     x_origin_DD[4, 5] = np.sqrt(1/2)*(1 + 1j);
@@ -46,8 +39,9 @@ for des_id in range(len(description)):
     # modulate
     otfs.modulate(x_origin_DD);
     # set the channel
-    otfs.addChannelPath(hi, li, ki);
-    H_DD = otfs.getChannel();
+    H_DD = otfs.setChannel(p=p, kmax=DopplerValue[des_id], lmax=lmax);
+    dopplers = otfs.getChannelDopplers();
+    sigs_dopplers[des_id] = dopplers;
     # pass the channel
     otfs.passChannel(No);
     # demodulate
@@ -61,11 +55,11 @@ for des_id in range(len(description)):
     # store
     sigs[des_id, ...] = Y_DD;
     sigs_X_DD[des_id, ...] = x_origin_DD;
-    
+
 # plot
 for des_id in range(len(description)):
-    fig = plt.figure(des_id, figsize=(8, 3*batch_size), constrained_layout=True); # constrained_layout avoid overlapping titles
-    fig.suptitle(description[des_id]);
+    fig = plt.figure(des_id, figsize=(8, (1+7*batch_size)), constrained_layout=True); # constrained_layout avoid overlapping titles
+    fig.suptitle(description[des_id]+", kmax="+str(sigs_dopplers[des_id][0]));
     figure_size = batch_size*100+22;
     for batch_id in range(batch_size):
         cur_figure_id = (batch_id + 1)*100;
@@ -90,4 +84,3 @@ for des_id in range(len(description)):
         ax2.bar3d(x, y, z, dx, dy, dz2, shade=True);
         ax2.set_title('After the channel')
     plt.show();
-    
