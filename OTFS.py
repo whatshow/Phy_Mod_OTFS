@@ -211,7 +211,7 @@ class OTFS(object):
         cp_len = np.max(self.delay_taps);
         s_cp = Channel_AddCP(self.s, cp_len, batch_size=self.batch_size);
         # pass the channel
-        s_chan = zeros(s_cp.shape[-1] + cp_len, batch_size=self.batch_size);
+        s_chan = self.zeros(s_cp.shape[-1] + cp_len);
         for tap_id in range(self.taps_num):
             hi = self.chan_coef[tap_id] if self.batch_size == OTFS.BATCH_SIZE_NO else np.expand_dims(self.chan_coef[..., tap_id], axis=-1);
             li = self.delay_taps[tap_id] if self.batch_size == OTFS.BATCH_SIZE_NO else self.delay_taps[..., tap_id];
@@ -219,7 +219,7 @@ class OTFS(object):
             cur_s_tmp = hi*circshift(
                 np.append(
                     np.multiply(s_cp, np.exp(1j*2*np.pi/self.nSubcarNum*seq(-cp_len, -cp_len+s_cp.shape[-1]-1, order='F', batch_size=self.batch_size)*ki/self.nTimeslotNum)), 
-                    zeros(cp_len, batch_size=self.batch_size),
+                    self.zeros(cp_len),
                     axis=-1), 
                 li,
                 batch_size=self.batch_size);
@@ -243,7 +243,7 @@ class OTFS(object):
     '''    
     def getChannel(self):
         # intialize the return channel
-        H_DD = zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum, batch_size=self.batch_size);
+        H_DD = self.zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum);
         # DFT & IDFT matrix
         dftmat = dftmtx(self.nTimeslotNum, batch_size=self.batch_size);
         idftmat = np.conj(dftmat);
@@ -326,6 +326,22 @@ class OTFS(object):
     # Functions uniform with non-batch and batch
     ##########################################################################
     '''
+    generate a matrix of all zeros
+    @order: 'C': this function only create given dimensions; 'F': create the dimensions as matlab (2D at least)
+    '''
+    def zeros(self, nrow, *args, order='C'):
+        out = None;
+        if order == 'F':
+            ncol = args[0] if len(args) >= 1 else nrow;
+            out = np.zeros((nrow, ncol)) if self.batch_size == OTFS.BATCH_SIZE_NO else np.zeros((self.batch_size, nrow, ncol));
+        elif order == 'C':
+            zeros_shape = list(args);
+            zeros_shape.insert(0, nrow);
+            if self.batch_size != OTFS.BATCH_SIZE_NO:
+                zeros_shape.insert(0, self.batch_size);
+            out = np.zeros(zeros_shape);
+        return out;
+    '''
     generate random values from [0, 1) following a uniform distribution
     @args: d0, d1, ..., dn (multiple inputs)
     '''
@@ -399,25 +415,6 @@ def eye(size, *, batch_size=BATCH_SIZE_NO):
     out = np.eye(size);
     if batch_size is not BATCH_SIZE_NO:
         out = np.tile(out,(batch_size, 1, 1));
-    return out;
-
-'''
-generate a matrix of all zeros
-@order: 'C': this function only create given dimensions; 'F': create the dimensions as matlab (2D at least)
-'''
-def zeros(nrow, *args, batch_size=BATCH_SIZE_NO, order='C'):
-    out = None;
-    if order == 'F':
-        ncol = nrow;
-        if len(args) >= 1:
-            ncol = args[0];
-            out = np.zeros((nrow, ncol)) if batch_size == BATCH_SIZE_NO else np.zeros((batch_size, nrow, ncol));
-    elif order == 'C':
-        zeros_shape = list(args);
-        zeros_shape.insert(0, nrow);
-        if batch_size != BATCH_SIZE_NO:
-            zeros_shape.insert(0, batch_size);
-        out = np.zeros(zeros_shape);
     return out;
 
 '''
