@@ -58,11 +58,11 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
         `@kmax`: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler<br>
         ```matlab
         % matlab
-        H_DD = otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
+        otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
         ```
         ```python
         # python
-        H_DD = otfs.setChannel(p=6, lmax=11, kmax=3);
+        otfs.setChannel(p=6, lmax=11, kmax=3);
         ```
     * generate fixed channel<br>
         `@gains:` the channel gains of [(batch_size), p]<br>
@@ -70,16 +70,17 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
         `@dopplers`: the channel Doppler shift of [(batch_size), p]<br>
         ```matlab
         % matlab
-        H_DD = otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
+        otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
         ```
         ```python
         # python
         # no batch
-        H_DD = otfs.setChannel(delays=[0, 1], dopplers=[2, 3], gains=[0.5, 0.5]);
+        otfs.setChannel(delays=[0, 1], dopplers=[2, 3], gains=[0.5, 0.5]);
         # using batch
-        H_DD = otfs.setChannel(delays=np.tile([0, 1], (batch_size, 1)), dopplers=np.tile([2, 3], (batch_size, 1)), gains=np.tile([0.5, 0.5], (batch_size, 1)));
+        otfs.setChannel(delays=np.tile([0, 1], (batch_size, 1)), dopplers=np.tile([2, 3], (batch_size, 1)), gains=np.tile([0.5, 0.5], (batch_size, 1)));
         ```
-    * return value: the channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
+* getChannel<br>
+    * return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
 * passChannel<br>
     `@No`: a scalar of the linear noise power
     ```python
@@ -94,7 +95,8 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
     ```
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
+* `TestDetect`: test all kinds of OTFS detectors
 * TestFractionalDoppler
 * TestOTFSAllFunctions: test all functions using random channels and fixed channels
 * TestWaveForms
-* Viterbo: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
+* `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).

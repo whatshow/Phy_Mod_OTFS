@@ -57,7 +57,8 @@ print("X_TF residual is %.16f"%residual_s);
 
 
 # set the channel
-H_DD = otfs.setChannel(p=6, lmax=11, kmax=3);
+otfs.setChannel(p=6, lmax=11, kmax=3);
+H_DD = otfs.getChannel();
 
 # pass the chanel
 otfs.passChannel(No);

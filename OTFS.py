@@ -29,7 +29,6 @@ class OTFS(object):
     X_TF = None;                                # Tx value in the time-frequency(TF) domain
     s = None;                                   # Tx value in the time domain (array)
     H = None;                                   # channel in the time domain
-    H_DD = None;                                # Effective channel in the DD domain
     r = None;                                   # Rx value in the time domain (array)
     Y_TF = None;                                # Rx value in the TF domain
     Y_DD = None;                                # Rx value in the DD domain
@@ -108,9 +107,10 @@ class OTFS(object):
     @lmax: the maxmimal delay index
     @kmax: the maximal Doppler index (can be fractional)
     <set known paths>
-    @delays:      the delays
-    @dopplers:    the doppler shifts
-    @gains:       the path gains
+    @delays:    the delays
+    @dopplers:  the doppler shifts
+    @gains:     the path gains
+    @rtnch:     whether return the channel
     '''
     def setChannel(self, *, p=0, lmax=0, kmax=0, delays=[], dopplers=[], gains=[]):
         # input check
@@ -178,9 +178,6 @@ class OTFS(object):
             self.taps_num = p;
         else:
             raise Exception("Channel Infomation is not recognised.");
-        # return the channel
-        H_DD = self.getChannel();
-        return H_DD;
     
     '''    
     add a path to the channel (this does not influence other existing paths)
@@ -274,7 +271,7 @@ class OTFS(object):
                 H_DD = H_DD + hi*Ti;
             else:
                 H_DD = H_DD + hi.reshape(-1, 1, 1)*Ti;
-        # record
+        # return
         return H_DD;
     
     '''

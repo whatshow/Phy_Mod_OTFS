@@ -1,4 +1,15 @@
 classdef OTFS < handle
+    % constants
+    properties(Constant)
+        PILOT_NO = 0;                               % no pilot
+        PILOT_SINGLE_SISO = 1;                      % a single pilot for SISO case
+        PILOT_TYPES = [OTFS.PILOT_NO, OTFS.PILOT_SINGLE_SISO];
+        DETECT_MP_BASE = 1;                         % Base OTFS MP detector proposed by P. Raviteja in 2018
+        DETECT_TYPES = [OTFS.DETECT_MP_BASE];
+        DETECT_CSI_PERFECT = 1;                     % we use the perfect CSI
+        DETECT_CSI_CE = 2;                          % we use the channel estimation to get CSI
+        DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE];
+    end
     properties
         nSubcarNum {mustBeInteger}                  % subcarrier number
         nTimeslotNum {mustBeInteger}                % timeslot number
@@ -8,7 +19,6 @@ classdef OTFS < handle
         X_TF                                        % Tx value in the time-frequency(TF) domain
         s                                           % Tx value in the time domain (array)
         H                                           % channel in the time domain
-        H_DD                                        % Effective channel in the DD domain
         r                                           % Rx value in the time domain (array)
         Y_TF                                        % Rx value in the TF domain
         Y_DD                                        % Rx value in the DD domain
@@ -16,6 +26,9 @@ classdef OTFS < handle
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
         chan_coef                                   % path gain, a row vector
+        pilot_type = OTFS.PILOT_SINGLE_SISO;        % 
+        detect_type = OTFS.DETECT_MP_BASE;          % Detect - type
+        detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % Detect - CSI type
     end
     
     methods
@@ -109,7 +122,7 @@ classdef OTFS < handle
         % @delays:      the delays
         % @dopplers:    the doppler shifts
         % @gains:       the path gains
-        function H_DD = setChannel(self, varargin)
+        function setChannel(self, varargin)
             % Inputs Name-Value Pair 
             inPar = inputParser;
             addParameter(inPar,'p', 0, @(x) isscalar(x)&&round(x)==x);
@@ -199,8 +212,6 @@ classdef OTFS < handle
             else
                 error("Channel Infomation is not recognised.");
             end
-            % return the channel
-            H_DD = self.getChannel();
         end
         
         % add a path to the channel (this does not influence other existing paths)
@@ -225,7 +236,6 @@ classdef OTFS < handle
             end
             self.taps_num = self.taps_num + 1;
         end
-        
         
         % pass the channel
         % @noisePow: noise power (a scalar)
@@ -262,6 +272,204 @@ classdef OTFS < handle
             r = self.r;
         end
         
+        %% OTFS Detectors
+        % detect
+        function symbols = detect(self, varargin)
+            % input check
+            inPar = inputParser;
+            addParameter(inPar,"detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_CSI_TYPES));
+            addParameter(inPar,"H_DD", [], @(x) isempty(x)||~isvector(x)&&ismatrix(x)&&isnumeric(x));
+            addParameter(inPar,"chan_coef", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"delay_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"doppler_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_TYPES));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % take inputs
+            self.detect_csi_type = inPar.Results.detect_csi_type;
+            H_DD = inPar.Results.H_DD;
+            chan_coef = inPar.Results.chan_coef;
+            delay_taps = inPar.Results.delay_taps;
+            doppler_taps = inPar.Results.doppler_taps;
+            self.detect_type = inPar.Results.detect_type;
+            
+            % retrieve the channel information
+            switch self.detect_type
+                case OTFS.DETECT_CSI_PERFECT
+                    chan_coef = []
+                case OTFS.DETECT_CSI_CE
+                    
+            end
+        end
+        
+        % MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
+        % @No:              the estimated noise power
+        % @constellation:   the constellation (a vector)
+        % @chan_coef:       the channel coefficient
+        % @delay_taps:      the delay indices
+        % @Doppler_taps:    the Doppler indices
+        % @n_ite:           the iteration number (200 by default)
+        % @delta_fra:       the percentage for taking the values in the current iteration
+        function symbols = detectMPBase(No, constellation, chan_coef, delay_taps, Doppler_taps, varargin)
+            % input check
+            if ~isscalar(No)
+                error("The noise power(linear) must be a scalar.");
+            end
+            if ~isvector(constellation)
+                error("The constellation must be a vector.");
+            else
+                % to row vector
+                constellation = constellation(:);
+                constellation = constellation.';
+            end
+            constellation_len = length(constellation);
+            if ~isvector(chan_coef)
+                error("The channel coefficient must be a vector.");
+            end
+            if ~isvector(delay_taps)
+                error("The delay indices must be a vector.");
+            end
+            if ~isvector(Doppler_taps)
+                error("The Doppler indices must be a vector.");
+            end
+            taps = length(chan_coef);
+            if taps ~= length(delay_taps) || taps ~= length(Doppler_taps)
+                error("The channel parameters do not have the same length.");
+            end
+            % optional inputs - register
+            default_n_ite = 200;
+            default_delta_fra = 0.6;
+            inPar = inputParser;
+            addParameter(inPar,"n_ite", default_n_ite, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"delta_fra", default_delta_fra, @(x) isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs
+            n_ite = inPar.Results.n_ite;
+            delta_fra = inPar.Results.delta_fra;
+            % set initial values
+            yv = reshape(self.Y_DD, self.nTimeslotNum*self.nSubcarNum, 1);
+            mean_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
+            var_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
+            p_map = ones(self.nTimeslotNum*self.nSubcarNum,taps, constellation_len)*(1/constellation_len);
+            % detect
+            conv_rate_prev = -0.1;
+            for ite=1:n_ite
+                % Update mean and var
+                for ele1=1:1:self.nSubcarNum
+                    for ele2=1:1:self.nTimeslotNum
+                        mean_int_hat = zeros(taps,1);
+                        var_int_hat = zeros(taps,1);
+                        for tap_no=1:taps
+                            m = ele1-1-delay_taps(tap_no)+1;
+                            add_term = exp(1i*2*(pi/self.nSubcarNum)*(m-1)*(Doppler_taps(tap_no)/self.nTimeslotNum));
+                            add_term1 = 1;
+                            if ele1-1<delay_taps(tap_no)
+                                n = mod(ele2-1-Doppler_taps(tap_no),self.nTimeslotNum) + 1;
+                                add_term1 = exp(-1i*2*pi*((n-1)/self.nTimeslotNum));
+                            end
+                            new_chan = add_term * (add_term1) * chan_coef(tap_no);
+
+                            for i2=1:1:constellation_len
+                                mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * alphabet(i2);
+                                var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(alphabet(i2))^2;
+                            end
+                            mean_int_hat(tap_no) = mean_int_hat(tap_no) * new_chan;
+                            var_int_hat(tap_no) = var_int_hat(tap_no) * abs(new_chan)^2;
+                            var_int_hat(tap_no) = var_int_hat(tap_no) - abs(mean_int_hat(tap_no))^2;
+                        end
+
+                        mean_int_sum = sum(mean_int_hat);
+                        var_int_sum = sum(var_int_hat)+(sigma_2);
+
+                        for tap_no=1:taps
+                            mean_int(self.nTimeslotNum*(ele1-1)+ele2,tap_no) = mean_int_sum - mean_int_hat(tap_no);
+                            var_int(self.nTimeslotNum*(ele1-1)+ele2,tap_no) = var_int_sum - var_int_hat(tap_no);
+                        end
+
+                    end
+                end
+                %% Update probabilities
+                sum_prob_comp = zeros(self.nTimeslotNum*self.nSubcarNum, constellation_len);
+                dum_eff_ele1 = zeros(taps,1);
+                dum_eff_ele2 = zeros(taps,1);
+                for ele1=1:1:self.nSubcarNum
+                    for ele2=1:1:self.nTimeslotNum
+                        dum_sum_prob = zeros(constellation_len,1);
+                        log_te_var = zeros(taps,constellation_len);
+                        for tap_no=1:taps
+
+                            if ele1+delay_taps(tap_no)<=self.nSubcarNum
+                                eff_ele1 = ele1 + delay_taps(tap_no);
+                                add_term = exp(1i*2*(pi/self.nSubcarNum)*(ele1-1)*(Doppler_taps(tap_no)/self.nTimeslotNum));
+                                int_flag = 0;
+                            else
+                                eff_ele1 = ele1 + delay_taps(tap_no)- self.nSubcarNum;
+                                add_term = exp(1i*2*(pi/self.nSubcarNum)*(ele1-1-self.nSubcarNum)*(Doppler_taps(tap_no)/self.nTimeslotNum));
+                                int_flag = 1;
+                            end
+                            add_term1 = 1;
+                            if int_flag==1
+                                add_term1 = exp(-1i*2*pi*((ele2-1)/self.nTimeslotNum));
+                            end
+                            eff_ele2 = mod(ele2-1+Doppler_taps(tap_no),self.nTimeslotNum) + 1;
+                            new_chan = add_term * add_term1 * chan_coef(tap_no);
+
+                            dum_eff_ele1(tap_no) = eff_ele1;
+                            dum_eff_ele2(tap_no) = eff_ele2;
+                            for i2=1:1:constellation_len
+                                dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * alphabet(i2))^2;
+                                dum_sum_prob(i2)= -(dum_sum_prob(i2)/var_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no));
+                            end
+                            dum_sum = dum_sum_prob - max(dum_sum_prob);
+                            dum1 = sum(exp(dum_sum));
+                            log_te_var(tap_no,:) = dum_sum - log(dum1);
+                        end
+                        for i2=1:1:constellation_len
+                            ln_qi(i2) = sum(log_te_var(:,i2));
+                        end
+                        dum_sum = exp(ln_qi - max(ln_qi));
+                        dum1 = sum(dum_sum);
+                        sum_prob_comp(self.nTimeslotNum*(ele1-1)+ele2,:) = dum_sum/dum1;
+                        for tap_no=1:1:taps
+                            eff_ele1 = dum_eff_ele1(tap_no);
+                            eff_ele2 = dum_eff_ele2(tap_no);
+
+                            dum_sum = log_te_var(tap_no,:);
+                            ln_qi_loc = ln_qi - dum_sum;
+                            dum_sum = exp(ln_qi_loc - max(ln_qi_loc));
+                            dum1 = sum(dum_sum);
+                            p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:) = (dum_sum/dum1)*delta_fra + (1-delta_fra)*reshape(p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:),1,constellation_len);
+                        end
+
+                    end
+                end
+                conv_rate =  sum(max(sum_prob_comp,[],2)>0.99)/(self.nTimeslotNum*self.nSubcarNum);
+                if conv_rate==1
+                    sum_prob_fin = sum_prob_comp;
+                    break;
+                elseif conv_rate > conv_rate_prev
+                    conv_rate_prev = conv_rate;
+                    sum_prob_fin = sum_prob_comp;
+                elseif (conv_rate < conv_rate_prev - 0.2) && conv_rate_prev > 0.95
+                    break;
+                end
+            end
+            % estimate symbols
+            X_DD_est = zeros(self.nTimeslotNum, self.nSubcarNum);
+            for ele1=1:1:self.nSubcarNum
+                for ele2=1:1:self.nTimeslotNum
+                    [~,pos] = max(sum_prob_fin(N*(ele1-1)+ele2,:));
+                    X_DD_est(ele2,ele1) = alphabet(pos);
+                end
+            end
+            % extract symbols
+            symbols = X_DD_est.';
+            symbols = symbols(:);
+        end
+        
         %% support function
         % Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
         function H_DD = getChannel(self)
@@ -291,8 +499,6 @@ classdef OTFS < handle
                 % add this path
                 H_DD = H_DD + hi*Ti;
             end
-            % record
-            self.H_DD = H_DD;
         end
         % get the channel delays
         function delays = getChannelDelays(self)

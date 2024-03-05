@@ -39,7 +39,8 @@ for des_id in range(len(description)):
     # modulate
     otfs.modulate(x_origin_DD);
     # set the channel
-    H_DD = otfs.setChannel(p=p, kmax=DopplerValue[des_id], lmax=lmax);
+    otfs.setChannel(p=p, kmax=DopplerValue[des_id], lmax=lmax);
+    H_DD = otfs.getChannel();
     dopplers = otfs.getChannelDopplers();
     sigs_dopplers[des_id] = dopplers;
     # pass the channel
