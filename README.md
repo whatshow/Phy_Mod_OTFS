@@ -81,9 +81,6 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
         ```
 * getChannel<br>
     return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
-    ```matlab
-    H_DD = otfs.getChannel();
-    ```
     ```python
     H_DD = otfs.getChannel();
     ```
