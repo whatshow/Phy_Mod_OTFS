@@ -13,8 +13,19 @@ from numpy.random import default_rng
 #        • set_transmission_symbols:                 
 class OTFS(object):
     # constants
-    FREQ_SPACING = 15;                          # default frequency spacing is 15kHz
-    FC = 3;                                     # default single carrier frequency is 3GHz
+    # Pilot
+    PILOT_NO = 0;                               # no pilot
+    PILOT_SINGLE_SISO = 1;                      # a single pilot for SISO case
+    PILOT_TYPES = [PILOT_NO, PILOT_SINGLE_SISO];
+    # Detect
+    DETECT_NO = 0;                              # no detection
+    DETECT_MP_BASE = 1;                         # Base OTFS MP detector proposed by P. Raviteja in 2018
+    DETECT_TYPES = [DETECT_NO, DETECT_MP_BASE];
+    # CSI
+    DETECT_CSI_PERFECT = 1;                     # perfect CSI
+    DETECT_CSI_CE = 2;                          # CSI from channel estimation (its type is based on pilot type) 
+    DETECT_CSI_TYPES = [DETECT_CSI_PERFECT, DETECT_CSI_CE];
+    # Batch
     BATCH_SIZE_NO = None;
     
     # batch
@@ -23,8 +34,8 @@ class OTFS(object):
     # variables
     nSubcarNum = None;                          # subcarrier number
     nTimeslotNum = None;                        # timeslot number
-    freq_spacing = None;                        # frequency spacing (kHz), the default is 15kHz
-    fc = None;                                  # single carrier frequency (GHz), the default is 3GHz
+    freq_spacing = 15;                          # frequency spacing (kHz), the default is 15kHz
+    fc = 3;                                     # single carrier frequency (GHz), the default is 3GHz
     X_DD = None;                                # Tx value in the delay Doppler(DD) domain
     X_TF = None;                                # Tx value in the time-frequency(TF) domain
     s = None;                                   # Tx value in the time domain (array)
@@ -36,6 +47,9 @@ class OTFS(object):
     delay_taps = None;                          # delay index, a row vector
     doppler_taps = None;                        # doppler index (integers or fractional numbers), a row vector
     chan_coef = None;                           # path gain, a row vector
+    pilot_type = PILOT_NO;                      # pilot - type 
+    detect_type = DETECT_NO;                    # detect - type
+    detect_csi_type = DETECT_CSI_PERFECT;       # detect - CSI type
     
     '''
     constructor
@@ -44,7 +58,7 @@ class OTFS(object):
     @freq_spacing:    frequency spacing (kHz), the default is 15kHz
     @fc:              single carrier frequency (GHz), the default is 3GHz
     '''
-    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=FREQ_SPACING, fc=FC, batch_size = BATCH_SIZE_NO):
+    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=None, fc=None, pilot_type=None, detect_type=None, detect_csi_type=None, batch_size = BATCH_SIZE_NO):
         if not isinstance(nSubcarNum, int):
             raise Exception("The number of subcarriers must be an integer scalar.");
         else:
@@ -53,8 +67,22 @@ class OTFS(object):
             raise Exception("The number of timeslots must be an integer scalar.");
         else:
             self.nTimeslotNum = nTimeslotNum;
-        self.freq_spacing = freq_spacing;
-        self.fc = fc;
+        # freq_spacing & fc
+        if freq_spacing is not None:
+            self.freq_spacing = freq_spacing;
+        if fc is not None:
+            self.fc = fc;
+        # detect, pillot & CSI
+        if pilot_type is not None:
+            self.pilot_type = pilot_type;
+        if detect_type is not None:
+            self.detect_type = detect_type;
+        if detect_csi_type is not None:
+            self.detect_csi_type = detect_csi_type;
+        if self.detect_type != OTFS.DETECT_NO:
+            if self.detect_csi_type == OTFS.DETECT_CSI_CE and self.pilot_type == OTFS.PILOT_NO:
+                raise Exception("Cannot detect symbols while not use pilots but need CSI from channel estiamtion.");
+        # batch_size
         self.batch_size = batch_size;
     
     '''
@@ -318,6 +346,12 @@ class OTFS(object):
             # vectorize
             s = reshape(s_mat, self.nSubcarNum*self.nTimeslotNum, batch_size=self.batch_size, order='F');
         return s;
+    
+    '''
+    get the received signal in the delay Doppler domain
+    '''
+    def getYDD(self):
+        return self.Y_DD;
     
     ##########################################################################
     # Functions uniform with non-batch and batch

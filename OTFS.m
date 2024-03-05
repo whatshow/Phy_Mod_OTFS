@@ -1,13 +1,17 @@
 classdef OTFS < handle
     % constants
     properties(Constant)
+        % Pilot
         PILOT_NO = 0;                               % no pilot
         PILOT_SINGLE_SISO = 1;                      % a single pilot for SISO case
         PILOT_TYPES = [OTFS.PILOT_NO, OTFS.PILOT_SINGLE_SISO];
-        DETECT_MP_BASE = 1;                         % Base OTFS MP detector proposed by P. Raviteja in 2018
-        DETECT_TYPES = [OTFS.DETECT_MP_BASE];
-        DETECT_CSI_PERFECT = 1;                     % we use the perfect CSI
-        DETECT_CSI_CE = 2;                          % we use the channel estimation to get CSI
+        % Detect
+        DETECT_NO = 0;                              % no detection
+        DETECT_MP_BASE = 1;                         % base OTFS MP detector proposed by P. Raviteja in 2018
+        DETECT_TYPES = [OTFS.DETECT_NO, OTFS.DETECT_MP_BASE];
+        % CSI
+        DETECT_CSI_PERFECT = 1;                     % perfect CSI
+        DETECT_CSI_CE = 2;                          % CSI from channel estimation (its type is based on pilot type)
         DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE];
     end
     properties
@@ -26,9 +30,9 @@ classdef OTFS < handle
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
         chan_coef                                   % path gain, a row vector
-        pilot_type = OTFS.PILOT_SINGLE_SISO;        % 
-        detect_type = OTFS.DETECT_MP_BASE;          % Detect - type
-        detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % Detect - CSI type
+        pilot_type = OTFS.PILOT_NO;                 % pilot - type 
+        detect_type = OTFS.DETECT_NO;               % detect - type
+        detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % detect - CSI type
     end
     
     methods
@@ -42,6 +46,9 @@ classdef OTFS < handle
             inPar = inputParser;
             addParameter(inPar,'freq_spacing', self.freq_spacing, @isnumeric);   % register "freq_spacing"
             addParameter(inPar,'fc', self.fc, @isnumeric);                       % register "fc"
+            addParameter(inPar,"pilot_type", self.pilot_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.PILOT_TYPES));
+            addParameter(inPar,"detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_TYPES));
+            addParameter(inPar,"detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_CSI_TYPES));
             inPar.KeepUnmatched = true;                                          % Allow unmatched cases
             inPar.CaseSensitive = false;                                         % Allow capital or small characters
             
@@ -62,6 +69,15 @@ classdef OTFS < handle
             parse(inPar, varargin{:}); 
             self.freq_spacing = inPar.Results.freq_spacing;
             self.fc = inPar.Results.fc;
+            % detect, pillot & CSI
+            self.pilot_type = inPar.Results.pilot_type;
+            self.detect_type = inPar.Results.detect_type;
+            self.detect_csi_type = inPar.Results.detect_csi_type;
+            if self.detect_type ~= OTFS.DETECT_NO
+                if self.detect_csi_type == OTFS.DETECT_CSI_CE && self.pilot_type == OTFS.PILOT_NO
+                    error("Cannot detect symbols while not use pilots but need CSI from channel estiamtion.");
+                end
+            end
         end
 
         % modulate
@@ -274,44 +290,9 @@ classdef OTFS < handle
         
         %% OTFS Detectors
         % detect
-        function symbols = detect(self, varargin)
-            % input check
-            inPar = inputParser;
-            addParameter(inPar,"detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_CSI_TYPES));
-            addParameter(inPar,"H_DD", [], @(x) isempty(x)||~isvector(x)&&ismatrix(x)&&isnumeric(x));
-            addParameter(inPar,"chan_coef", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            addParameter(inPar,"delay_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            addParameter(inPar,"doppler_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            addParameter(inPar,"detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_TYPES));
-            inPar.KeepUnmatched = true;
-            inPar.CaseSensitive = false;
-            parse(inPar, varargin{:});
-            % take inputs
-            self.detect_csi_type = inPar.Results.detect_csi_type;
-            H_DD = inPar.Results.H_DD;
-            chan_coef = inPar.Results.chan_coef;
-            delay_taps = inPar.Results.delay_taps;
-            doppler_taps = inPar.Results.doppler_taps;
-            self.detect_type = inPar.Results.detect_type;
-            
-            % retrieve the channel information
-            switch self.detect_type
-                case OTFS.DETECT_CSI_PERFECT
-                    chan_coef = []
-                case OTFS.DETECT_CSI_CE
-                    
-            end
-        end
-        
-        % MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
-        % @No:              the estimated noise power
-        % @constellation:   the constellation (a vector)
-        % @chan_coef:       the channel coefficient
-        % @delay_taps:      the delay indices
-        % @Doppler_taps:    the Doppler indices
-        % @n_ite:           the iteration number (200 by default)
-        % @delta_fra:       the percentage for taking the values in the current iteration
-        function symbols = detectMPBase(No, constellation, chan_coef, delay_taps, Doppler_taps, varargin)
+        % @No: estimated noise power (linear)
+        % @constellation: the constellation (a vector)
+        function symbols = detect(self, No, constellation, varargin)
             % input check
             if ~isscalar(No)
                 error("The noise power(linear) must be a scalar.");
@@ -323,6 +304,49 @@ classdef OTFS < handle
                 constellation = constellation(:);
                 constellation = constellation.';
             end
+            % input check - optional
+            inPar = inputParser;
+            addParameter(inPar,"H_DD", [], @(x) isempty(x)||~isvector(x)&&ismatrix(x)&&isnumeric(x));
+            addParameter(inPar,"chan_coef", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"delay_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"doppler_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % take inputs
+            H_DD = inPar.Results.H_DD;
+            chan_coef = inPar.Results.chan_coef;
+            delay_taps = inPar.Results.delay_taps;
+            doppler_taps = inPar.Results.doppler_taps;
+            
+            % retrieve the channel information
+            switch self.detect_csi_type
+                case OTFS.DETECT_CSI_PERFECT
+                    chan_coef = self.chan_coef;
+                    delay_taps = self.delay_taps;
+                    doppler_taps = self.doppler_taps;
+                case OTFS.DETECT_CSI_CE
+                    
+            end
+            % estimate the symbols
+            switch self.detect_type
+                case OTFS.DETECT_NO
+                    symbols = [];
+                case OTFS.DETECT_MP_BASE
+                    symbols = self.detectMPBase(No, constellation, chan_coef, delay_taps, doppler_taps);
+            end
+        end
+        
+        % MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
+        % @No:              the estimated noise power
+        % @constellation:   the constellation (a vector)
+        % @chan_coef:       the channel coefficient
+        % @delay_taps:      the delay indices
+        % @Doppler_taps:    the Doppler indices
+        % @n_ite:           the iteration number (200 by default)
+        % @delta_fra:       the percentage for taking the values in the current iteration
+        function symbols = detectMPBase(self, No, constellation, chan_coef, delay_taps, Doppler_taps, varargin)
+            % input check
             constellation_len = length(constellation);
             if ~isvector(chan_coef)
                 error("The channel coefficient must be a vector.");
@@ -373,8 +397,8 @@ classdef OTFS < handle
                             new_chan = add_term * (add_term1) * chan_coef(tap_no);
 
                             for i2=1:1:constellation_len
-                                mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * alphabet(i2);
-                                var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(alphabet(i2))^2;
+                                mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * constellation(i2);
+                                var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(constellation(i2))^2;
                             end
                             mean_int_hat(tap_no) = mean_int_hat(tap_no) * new_chan;
                             var_int_hat(tap_no) = var_int_hat(tap_no) * abs(new_chan)^2;
@@ -382,7 +406,7 @@ classdef OTFS < handle
                         end
 
                         mean_int_sum = sum(mean_int_hat);
-                        var_int_sum = sum(var_int_hat)+(sigma_2);
+                        var_int_sum = sum(var_int_hat)+(No);
 
                         for tap_no=1:taps
                             mean_int(self.nTimeslotNum*(ele1-1)+ele2,tap_no) = mean_int_sum - mean_int_hat(tap_no);
@@ -420,7 +444,7 @@ classdef OTFS < handle
                             dum_eff_ele1(tap_no) = eff_ele1;
                             dum_eff_ele2(tap_no) = eff_ele2;
                             for i2=1:1:constellation_len
-                                dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * alphabet(i2))^2;
+                                dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * constellation(i2))^2;
                                 dum_sum_prob(i2)= -(dum_sum_prob(i2)/var_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no));
                             end
                             dum_sum = dum_sum_prob - max(dum_sum_prob);
@@ -461,8 +485,8 @@ classdef OTFS < handle
             X_DD_est = zeros(self.nTimeslotNum, self.nSubcarNum);
             for ele1=1:1:self.nSubcarNum
                 for ele2=1:1:self.nTimeslotNum
-                    [~,pos] = max(sum_prob_fin(N*(ele1-1)+ele2,:));
-                    X_DD_est(ele2,ele1) = alphabet(pos);
+                    [~,pos] = max(sum_prob_fin(self.nTimeslotNum*(ele1-1)+ele2,:));
+                    X_DD_est(ele2,ele1) = constellation(pos);
                 end
             end
             % extract symbols
@@ -512,7 +536,6 @@ classdef OTFS < handle
         function gains = getChannelGains(self)
             gains = self.chan_coef;
         end
-        
         % get the signal in the Delay Time domain [delay, time]
         function X_DT = getX2DT(self)
             X_DT = ifft(self.X_DD).';
@@ -541,6 +564,10 @@ classdef OTFS < handle
                 % vectorize
                 s = s_mat(:);
             end
+        end
+        % get the received signal in delay Doppler domain
+        function Y_DD = getYDD(self)
+            Y_DD = self.Y_DD;
         end
     end
 end

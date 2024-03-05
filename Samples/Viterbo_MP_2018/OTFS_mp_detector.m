@@ -25,12 +25,18 @@
 %    - Latest version of this code may be downloaded from: https://ecse.monash.edu/staff/eviterbo/
 %    - Freely distributed for educational and research purposes
 %%
-function x_est = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,Doppler_taps,chan_coef,sigma_2,y)
-
+function x_est = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,Doppler_taps,chan_coef,sigma_2,y, varargin)
+    % optional inputs
+    inPar = inputParser;
+    addParameter(inPar,"constellation", qammod(0:M_mod-1,M_mod, 'gray'), @isvector);
+    inPar.KeepUnmatched = true;
+    inPar.CaseSensitive = false;
+    parse(inPar, varargin{:});
+    alphabet = inPar.Results.constellation;
+    
     yv = reshape(y,N*M,1);
     n_ite = 200;
     delta_fra = 0.6;
-    alphabet = qammod(0:M_mod-1,M_mod, 'gray');
 
     mean_int = zeros(N*M,taps);
     var_int = zeros(N*M,taps);
