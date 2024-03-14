@@ -15,12 +15,11 @@ Currently, we offer three options to install this tool.
         ```
         from whatshow_phy_mod_otfs import OTFS
         ```
-    * Install through git under another local repositiory
-    ```sh
-    git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
-    ```
-    Now, you can see a folder `Modules` with `Mod_OTFS` inside
-    
+* Install through git under another local repositiory
+```sh
+git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
+```
+Now, you can see a folder `Modules` with `Mod_OTFS` inside
     * **Import this model**
         * Matlab
             ```
