@@ -1,24 +1,38 @@
 # OTFS modulation
 This repositiory is a foundamental toolbox of OTFS modulation crossing `matlab` and `python`.
 
-* **In another local repositiory, add this module**
-```sh
-git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
-```
-Now, you can see a folder `Modules` with `Mod_OTFS` inside
+## How to install
+Currently, we offer three options to install this tool.
+* Install through `Matlab Add-Ons`
 
-* **Import this model**
-    * Matlab
+    Go to [releases](https://github.com/whatshow/Phy_Mod_OTFS/releases) to download the file `whatshow_phy_mod_otfs.mltbx` in the latest release to install.<br>
+    The class `OTFS` will be automatically added in Matlab. (Don't forget to restart Matlab after installation).
+* Install through `pip`
+    ```sh
+    pip install whatshow-phy-mod-otfs
+    ```
+    * **import this module**
         ```
-        addpath("Modules/OTFS");
+        from whatshow_phy_mod_otfs import OTFS
         ```
-    * Python
-        ```python
-        if '.' not in __name__ :
-            from Modules.Mod_OTFS.OTFS import OTFS
-        else:
-            from .Modules.Mod_OTFS.OTFS import OTFS
-        ```
+    * Install through git under another local repositiory
+    ```sh
+    git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
+    ```
+    Now, you can see a folder `Modules` with `Mod_OTFS` inside
+    
+    * **Import this model**
+        * Matlab
+            ```
+            addpath("Modules/OTFS");
+            ```
+        * Python
+            ```python
+            if '.' not in __name__ :
+                from Modules.Mod_OTFS.OTFS import OTFS
+            else:
+                from .Modules.Mod_OTFS.OTFS import OTFS
+            ```
 
 ## How to use
 All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class is the whole process of OTFS. This section will illustrate the methods of this class following the process from Tx to Rx.
