@@ -16,22 +16,22 @@ Currently, we offer three options to install this tool.
         from whatshow_phy_mod_otfs import OTFS
         ```
 * Install through git under another local repositiory
-```sh
-git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
-```
-Now, you can see a folder `Modules` with `Mod_OTFS` inside
+    ```sh
+    git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
+    ```
+    Now, you can see a folder `Modules` with `Mod_OTFS` inside
     * **Import this model**
-        * Matlab
-            ```
-            addpath("Modules/OTFS");
-            ```
-        * Python
-            ```python
-            if '.' not in __name__ :
-                from Modules.Mod_OTFS.OTFS import OTFS
-            else:
-                from .Modules.Mod_OTFS.OTFS import OTFS
-            ```
+        ```
+        % matlab
+        addpath("Modules/OTFS");
+        ```
+        ```python
+        # python
+        if '.' not in __name__ :
+            from Modules.Mod_OTFS.OTFS import OTFS
+        else:
+            from .Modules.Mod_OTFS.OTFS import OTFS
+        ```
 
 ## How to use
 All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class is the whole process of OTFS. This section will illustrate the methods of this class following the process from Tx to Rx.
