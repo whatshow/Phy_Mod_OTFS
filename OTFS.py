@@ -51,12 +51,19 @@ class OTFS(object):
     detect_type = DETECT_NO;                    # detect - type
     detect_csi_type = DETECT_CSI_PERFECT;       # detect - CSI type
     
+    ###########################################################################
+    # General OTFS Methods
+    ###########################################################################
     '''
     constructor
     @nSubcarNum:      subcarrier number
     @nTimeslotNum:    timeslot number
     @freq_spacing:    frequency spacing (kHz), the default is 15kHz
     @fc:              single carrier frequency (GHz), the default is 3GHz
+    @pilot_type:      pilot type
+    @guard_type:      guard type
+    @detect_type:     detect type
+    @detect_csi_type: detect CSI type
     '''
     def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=None, fc=None, pilot_type=None, detect_type=None, detect_csi_type=None, batch_size = BATCH_SIZE_NO):
         if not isinstance(nSubcarNum, int):
@@ -72,16 +79,18 @@ class OTFS(object):
             self.freq_spacing = freq_spacing;
         if fc is not None:
             self.fc = fc;
-        # detect, pillot & CSI
+        # pillot
         if pilot_type is not None:
             self.pilot_type = pilot_type;
+        # detect
         if detect_type is not None:
             self.detect_type = detect_type;
+        # detect-CSI
         if detect_csi_type is not None:
             self.detect_csi_type = detect_csi_type;
         if self.detect_type != OTFS.DETECT_NO:
             if self.detect_csi_type == OTFS.DETECT_CSI_CE and self.pilot_type == OTFS.PILOT_NO:
-                raise Exception("Cannot detect symbols while not use pilots but need CSI from channel estiamtion.");
+                raise Exception("Cannot detect symbols while use no pilot but need CSI from channel estiamtion.");
         # batch_size
         self.batch_size = batch_size;
     
@@ -228,6 +237,10 @@ class OTFS(object):
             self.doppler_taps = np.append(self.doppler_taps, ki, axis=-1);
         self.taps_num = self.taps_num + 1;
     
+    '''
+    pass the channel
+    @noisePow: noise power (a scalar)
+    '''
     def passChannel(self, noPow):
         noPow = np.asarray(noPow);
         if noPow.ndim != 0:
@@ -259,6 +272,10 @@ class OTFS(object):
         self.r = self.r[cp_len:cp_len+(self.nTimeslotNum*self.nSubcarNum)] if self.batch_size == OTFS.BATCH_SIZE_NO else self.r[:, cp_len:cp_len+(self.nTimeslotNum*self.nSubcarNum)];
         # return
         return self.r;
+    
+    ###########################################################################
+    # OTFS Detectors
+    ###########################################################################
     
     ###########################################################################
     # support function

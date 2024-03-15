@@ -3,8 +3,20 @@ classdef OTFS < handle
     properties(Constant)
         % Pilot
         PILOT_NO = 0;                               % no pilot
-        PILOT_SINGLE_SISO = 1;                      % a single pilot for SISO case
-        PILOT_TYPES = [OTFS.PILOT_NO, OTFS.PILOT_SINGLE_SISO];
+        PILOT_SINGLE_SISO = 10;                     % a single pilot for SISO case
+        PILOT_MULTIP_SISO = 20;                     % multiple pilots for SISO case
+        PILOT_TYPES = [OTFS.PILOT_NO, OTFS.PILOT_SINGLE_SISO, OTFS.PILOT_MULTIP_SISO];
+        % Pilot locations
+        PILOT_LOC_CENTER = 10;                      % the pilot is put at the center of frame
+        PILOT_LOC_DELAY_MOST_CENTER = 20;           % the pilot is put at the most delay area center
+        PILOT_LOC_TYPES = [OTFS.PILOT_LOC_CENTER, OTFS.PILOT_LOC_DELAY_MOST_CENTER];
+        % Guard
+        GUARD_NO = 0;
+        GUARD_ENTIRE = 10;                          % guards take all rest positions
+        GUARD_FULL = 20;                            % guards take all rows along the Doppler(time) axis
+        GUARD_REDUCED = 30;                         % guards take limited rows along the Doppler(time) axis
+        GUARD_REDUCED_EXTRA = 31;                   % guards take limited & extra rows along the Doppler(time) axis
+        GUARD_TYPES = [OTFS.GUARD_NO, OTFS.GUARD_ENTIRE, OTFS.GUARD_FULL, OTFS.GUARD_REDUCED, OTFS.GUARD_REDUCED_EXTRA];
         % Detect
         DETECT_NO = 0;                              % no detection
         DETECT_MP_BASE = 1;                         % base OTFS MP detector proposed by P. Raviteja in 2018
@@ -30,25 +42,46 @@ classdef OTFS < handle
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
         chan_coef                                   % path gain, a row vector
-        pilot_type = OTFS.PILOT_NO;                 % pilot - type 
+        % pilot
+        pilot_type = OTFS.PILOT_NO;                 % pilot - type
+        pilots = [];                                % pilots value
+        pilots_num_delay = 0;                       % pilots number along the delay(Doppler) axis
+        pilots_num_doppler = 0;                     % pilots number along the Doppler(time) axis
+        % pilot location
+        pilot_loc_type = OTFS.PILOT_LOC_CENTER;
+        % guard
+        guard_type = OTFS.GUARD_NO;                 % guard - type
+        guard_delay_num_neg = 0;                    % guard number negatively along the delay(frequency) axis
+        guard_delay_num_pos = 0;                    % guard number positively along the delay(frequency) axis
+        guard_doppler_num_neg = 0;                  % guard number negatively along the Doppler(time) axis
+        guard_doppler_num_pos = 0;                  % guard number positively along the Doppler(time) axis
+        % detection
         detect_type = OTFS.DETECT_NO;               % detect - type
         detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % detect - CSI type
     end
     
     methods
+        %% General OTFS Methods
         % constructor
-        % @nSubcarNum:      subcarrier number
-        % @nTimeslotNum:    timeslot number
-        % @freq_spacing:    frequency spacing (kHz), the default is 15kHz
-        % @fc:              single carrier frequency (GHz), the default is 3GHz
+        % @nSubcarNum:              subcarrier number
+        % @nTimeslotNum:            timeslot number
+        % @freq_spacing:            frequency spacing (kHz), the default is 15kHz
+        % @fc:                      single carrier frequency (GHz), the default is 3GHz
+        % @pilot_type:              pilot type
+        % @pilot_loc_type:          pilot location type
+        % @guard_type:              guard type
+        % @detect_type:             detect type
+        % @detect_csi_type:         detect CSI type
         function self = OTFS(nSubcarNum, nTimeslotNum, varargin)
             % Inputs Name-Value Pair 
             inPar = inputParser;
-            addParameter(inPar,'freq_spacing', self.freq_spacing, @isnumeric);   % register "freq_spacing"
-            addParameter(inPar,'fc', self.fc, @isnumeric);                       % register "fc"
-            addParameter(inPar,"pilot_type", self.pilot_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.PILOT_TYPES));
-            addParameter(inPar,"detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_TYPES));
-            addParameter(inPar,"detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_CSI_TYPES));
+            addParameter(inPar, 'freq_spacing', self.freq_spacing, @isnumeric);   % register "freq_spacing"
+            addParameter(inPar, 'fc', self.fc, @isnumeric);                       % register "fc"
+            addParameter(inPar, "pilot_type", self.pilot_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.PILOT_TYPES));
+            addParameter(inPar, "pilot_loc_type", self.pilot_loc_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.PILOT_LOC_TYPES));
+            addParameter(inPar, "guard_type", self.guard_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.GUARD_TYPES));
+            addParameter(inPar, "detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_TYPES));
+            addParameter(inPar, "detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, OTFS.DETECT_CSI_TYPES));
             inPar.KeepUnmatched = true;                                          % Allow unmatched cases
             inPar.CaseSensitive = false;                                         % Allow capital or small characters
             
@@ -69,15 +102,68 @@ classdef OTFS < handle
             parse(inPar, varargin{:}); 
             self.freq_spacing = inPar.Results.freq_spacing;
             self.fc = inPar.Results.fc;
-            % detect, pillot & CSI
+            % pillot
             self.pilot_type = inPar.Results.pilot_type;
+            % guard
+            self.guard_type = inPar.Results.guard_type;
+            % detect
             self.detect_type = inPar.Results.detect_type;
+            % detect-CSI
             self.detect_csi_type = inPar.Results.detect_csi_type;
             if self.detect_type ~= OTFS.DETECT_NO
                 if self.detect_csi_type == OTFS.DETECT_CSI_CE && self.pilot_type == OTFS.PILOT_NO
-                    error("Cannot detect symbols while not use pilots but need CSI from channel estiamtion.");
+                    error("Cannot detect symbols while use no pilot but need CSI from channel estiamtion.");
                 end
             end
+        end
+        
+        % insert pilots and guards
+        % @pilots:                  a vector of your pilots (if given `pilots_pow` won't be used)
+        % @pilots_pow:              pilot power to generate random pilots
+        % @pilots_num_delay:        pilots number along the delay(Doppler) axis
+        % @pilots_num_doppler:      pilots number along the Doppler(time) axis
+        % @guard_delay_num_neg:     guard number negatively along the delay(frequency) axis
+        % @guard_delay_num_pos:     guard number positively along the delay(frequency) axis
+        % @guard_doppler_num_neg:   guard number negatively along the Doppler(time) axis
+        % @guard_doppler_num_pos:   guard number positively along the Doppler(time) axis
+        function insertPilotsAndGuards(self, pilots_num_delay, pilots_num_doppler, guard_delay_num_neg, guard_delay_num_pos, guard_doppler_num_neg, guard_doppler_num_pos, varargin)
+            % optional inputs 
+            inPar = inputParser;
+            addParameter(inPar, 'pilots', self.pilots, @(x) isvector(x)&&isnumeric(x));
+            addParameter(inPar, 'pilots_pow', NaN, @(x) isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            parse(inPar, varargin{:});
+            % arrange pilots
+            self.pilots = inPar.Results.pilots;
+            pilots_len = length(self.pilots);
+            if ~isempty(self.pilots)
+                if pilots_len ~= pilots_num_delay*pilots_num_doppler
+                    error("The manual pilot input do not have the required number.");
+                end
+                if pilots_len > self.nTimeslotNum*self.nSubcarNum
+                    error("The manual pilot input overflows (over the OTFS frame size).");
+                end
+            end
+            % create pilots if not given
+            pilots_pow = inPar.Results.pilots_pow;
+            pilots_len = pilots_num_delay*pilots_num_doppler;
+            if isnan(pilots_pow)
+                error("The pilots (linear) power is required while no manual pilot input.");
+            end
+            if isempty(self.pilots)
+                switch self.pilot_type
+                    % SISO cases (only use ones)
+                    case {OTFS.PILOT_SINGLE_SISO, OTFS.PILOT_MULTIP_SISO}
+                        self.pilots = ones(pilots_len, 1)*sqrt(pilots_pow);
+                end
+            end
+            % allocate X_DD if empty
+            if isempty(self.X_DD)
+                self.X_DD = zeros(self.nTimeslotNum, self.nSubcarNum);
+            end
+            % allocate pilots
+            
         end
 
         % modulate
@@ -115,6 +201,8 @@ classdef OTFS < handle
             % vectorize
             self.s = s_mat(:);
         end
+        
+        
         
         % demodulate
         function yDD = demodulate(self)
