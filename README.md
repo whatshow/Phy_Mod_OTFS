@@ -1,5 +1,6 @@
 # OTFS modulation
 [![PyPi](https://img.shields.io/badge/PyPi-1.0.1-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-1.0.1-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
+
 This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`.
 
 ## How to install
