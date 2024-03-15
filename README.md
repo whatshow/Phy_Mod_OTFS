@@ -1,12 +1,11 @@
 # OTFS modulation
-This repositiory is a foundamental toolbox of OTFS modulation crossing `matlab` and `python`.
+This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`.
 
 ## How to install
 Currently, we offer three options to install this tool.
 * Install through `Matlab Add-Ons`
-
-    Go to [releases](https://github.com/whatshow/Phy_Mod_OTFS/releases) to download the file `whatshow_phy_mod_otfs.mltbx` in the latest release to install.<br>
-    The class `OTFS` will be automatically added in Matlab. (Don't forget to restart Matlab after installation).
+    * Install through Matlab `Get Add-Ons`: search `whatshow_phy_mod_otfs` and install it.
+    * Install through `.mltbx`: Go to [releases](https://github.com/whatshow/Phy_Mod_OTFS/releases) to download the file `whatshow_phy_mod_otfs.mltbx` in the latest release to install.
 * Install through `pip`
     ```sh
     pip install whatshow-phy-mod-otfs
@@ -65,7 +64,7 @@ All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class
 * setChannel<br>
     This methods has 2 kinds of inputs.
     * generate random channel<br>
-        If we use `batch`, the channel will be different for each sample in the batch.
+        If we use `batch`, the channel will be different for each sample in the batch.<br>
         `@p`: the path number (scalar)<br>
         `@lmax`: the maximal integer delay index (scalar)<br>
         `@kmax`: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler<br>

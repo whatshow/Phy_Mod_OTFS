@@ -4,8 +4,37 @@
     <param.authnamewatermark>whatshow</param.authnamewatermark>
     <param.email>wfwfpwefe2323@gmail.com</param.email>
     <param.company />
-    <param.summary />
-    <param.description />
+    <param.summary>This repository is a fundamental toolbox of OTFS modulation.</param.summary>
+    <param.description>This section will illustrate the methods of this class following the process from Tx to Rx.
+1. OTFS
+@nSubcarNum: the subcarrier number
+@nTimeslotNum: the timeslot number
+@batch_size(optional) : the batch size (only used in python).
+nSubcarNum = 16;
+nTimeslotNum = 7;
+otfs = OTFS(nSubcarNum, nTimeslotNum);
+2. modulate
+@symbols: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]
+otfs.modulate(x_origin);
+3. setChannel (this methods has 2 kinds of inputs)
+3.1 generate random channel: If we use batch, the channel will be different for each sample in the batch. 
+@p: the path number (scalar)
+@lmax: the maximal integer delay index (scalar)
+@kmax: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler
+otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
+3.2 generate fixed channel
+@gains: the channel gains of [(batch_size), p]
+@delays: the channel delays of [(batch_size), p]
+@dopplers: the channel Doppler shift of [(batch_size), p]
+otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
+4. getChannel: return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNumnTimeslotNum, nSubcarNumnTimeslotNum]
+H_DD = otfs.getChannel();
+5. passChannel
+@No: a scalar of the linear noise power# matlab &amp; python
+otfs.passChannel(No);
+6. demodulate
+return value: the vectorized received signal in the delay Doppler domain, a vector of [(batch_size), nSubcarNum*nTimeslotNum]
+yDD = otfs.demodulate();</param.description>
     <param.screenshot />
     <param.version>1.0.1</param.version>
     <param.output>${PROJECT_ROOT}\whatshow_phy_mod_otfs.mltbx</param.output>
@@ -34,8 +63,15 @@ init.m
     <param.apps />
     <param.registered.apps />
     <param.docs />
-    <param.getting.started.guide />
-    <param.matlabpath.excludes />
+    <param.getting.started.guide>${PROJECT_ROOT}\doc\GettingStarted.mlx</param.getting.started.guide>
+    <param.matlabpath.excludes>
+      <item>/Samples</item>
+      <item>/Samples/TestDetect</item>
+      <item>/Samples/TestFractionalDoppler</item>
+      <item>/Samples/TestOTFSAllFunctions</item>
+      <item>/Samples/TestWaveForms</item>
+      <item>/Samples/Viterbo_MP_2018</item>
+    </param.matlabpath.excludes>
     <param.javaclasspath.excludes />
     <param.exported.on.package>false</param.exported.on.package>
     <param.required.addons />
@@ -56,8 +92,6 @@ init.m
     <param.additional.sw.linux.url />
     <unset>
       <param.company />
-      <param.summary />
-      <param.description />
       <param.screenshot />
       <param.output />
       <param.products.name />
@@ -70,8 +104,6 @@ init.m
       <param.apps />
       <param.registered.apps />
       <param.docs />
-      <param.getting.started.guide />
-      <param.matlabpath.excludes />
       <param.javaclasspath.excludes />
       <param.exported.on.package />
       <param.required.addons />
