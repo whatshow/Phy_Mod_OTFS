@@ -155,7 +155,7 @@ classdef OTFS < handle
                 switch self.pilot_type
                     % SISO cases (only use ones)
                     case {OTFS.PILOT_SINGLE_SISO, OTFS.PILOT_MULTIP_SISO}
-                        self.pilots = ones(pilots_len, 1)*sqrt(pilots_pow);
+                        self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(pilots_len, 1);
                 end
             end
             % allocate X_DD if empty
