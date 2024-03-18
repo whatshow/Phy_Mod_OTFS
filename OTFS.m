@@ -41,7 +41,7 @@ classdef OTFS < handle
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
         chan_coef                                   % path gain, a row vector
-        % invalid area in X_DD
+        % invalid area in X_DD (these parameters will be set after `insertPilotsAndGuards`)
         X_DD_invalid_num = 0;
         X_DD_invalid_delay_beg = NaN;
         X_DD_invalid_delay_end = NaN;
@@ -56,6 +56,14 @@ classdef OTFS < handle
         pilot_loc_type = OTFS.PILOT_LOC_CENTER;
         % guard
         guard_type = OTFS.GUARD_NO;                 % guard - type
+        % channel estimation
+        ce_delay_beg = NaN;
+        ce_delay_end = NaN;
+        ce_doppl_beg = NaN;
+        ce_doppl_end = NaN;
+        ce_delay_taps                               % estimated delay index, a row vector
+        ce_doppler_taps                             % estimated doppler index (integers or fractional numbers), a row vector
+        ce_chan_coef                                % estimated path gain, a row vector
         % detection
         detect_type = OTFS.DETECT_NO;               % detect - type
         detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % detect - CSI type
@@ -199,48 +207,51 @@ classdef OTFS < handle
                     end
             end
 
-            % allocate X_DD if empty
+            % initiate X_DD if empty
             if isempty(self.X_DD)
                 self.X_DD = zeros(self.nTimeslotNum, self.nSubcarNum);
             end
-            % allocate pilots
-            if isempty(self.pilots)
-                pilots_len = pilots_num_delay*pilots_num_doppler;
-                % if we should allocate pilots
-                if pilots_len > 0
-                    % create pilots if not given
-                    switch self.pilot_type
-                        % SISO cases (only use ones)
-                        case {self.PILOT_SINGLE_SISO, self.PILOT_MULTIP_SISO}
-                            self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(pilots_len, 1);
-                    end
-                    % calulate the data number for two axises
-                    data_delay_num = (self.nSubcarNum - pilots_num_delay - guard_delay_num_neg - guard_delay_num_pos);
-                    data_doppler_num = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg - guard_doppler_num_pos;
-                    % calculate the pilot start point shift due to asymmetric guards
-                    pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
-                    pilot_shift_doppler_pos = guard_doppler_num_pos - guard_doppler_num_neg;
-                    % locate the 1st coordinates of the pilots (following the positive direction of axises)
-                    plots_loc_delay = 0;
-                    plots_loc_doppler = 0;
-                    switch self.pilot_loc_type
-                        case self.PILOT_LOC_CENTER
-                            plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                            plots_loc_doppler = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
-                        case self.PILOT_LOC_DELAY_MOST_CENTER 
-                            plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                            plots_loc_doppler = data_doppler_num + guard_doppler_num_neg + 1;
-                    end
-                    % allocate pilots
-                    self.X_DD(plots_loc_doppler:plots_loc_doppler+pilots_num_doppler-1, plots_loc_delay:plots_loc_delay+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
-                    % calculate the invalid area in X_DD
-                    self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
-                    self.X_DD_invalid_delay_beg = plots_loc_delay - guard_delay_num_neg;
-                    self.X_DD_invalid_delay_end = plots_loc_delay + pilots_num_delay - 1 + guard_delay_num_pos;
-                    self.X_DD_invalid_doppl_beg = plots_loc_doppler - guard_doppler_num_neg;
-                    self.X_DD_invalid_doppl_end = plots_loc_doppler + pilots_num_doppler - 1 + guard_doppler_num_pos;
-                    assert(self.X_DD_invalid_num == (self.X_DD_invalid_delay_end - self.X_DD_invalid_delay_beg + 1)*(self.X_DD_invalid_doppl_end - self.X_DD_invalid_doppl_beg + 1));
+            % initiate pilots if empty
+            pilots_len = pilots_num_delay*pilots_num_doppler;
+            if isempty(self.pilots) && pilots_len > 0
+                switch self.pilot_type
+                    % SISO cases (only use ones)
+                    case {self.PILOT_SINGLE_SISO, self.PILOT_MULTIP_SISO}
+                        self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(pilots_len, 1);
                 end
+            end
+            % allocate pilots
+            if pilots_len == 0
+                % no pilots no operation
+                self.X_DD_invalid_num = 0;
+            else
+                % some pilots
+                % calulate the data number for two axises
+                data_delay_num = (self.nSubcarNum - pilots_num_delay - guard_delay_num_neg - guard_delay_num_pos);
+                data_doppler_num = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg - guard_doppler_num_pos;
+                % calculate the pilot start point shift due to asymmetric guards
+                pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
+                pilot_shift_doppler_pos = guard_doppler_num_pos - guard_doppler_num_neg;
+                % locate the 1st coordinates of the pilots (following the positive direction of axises)
+                plots_loc_delay = 0;
+                plots_loc_doppler = 0;
+                switch self.pilot_loc_type
+                    case self.PILOT_LOC_CENTER
+                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        plots_loc_doppler = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
+                    case self.PILOT_LOC_DELAY_MOST_CENTER 
+                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        plots_loc_doppler = data_doppler_num + guard_doppler_num_neg + 1;
+                end
+                % allocate pilots
+                self.X_DD(plots_loc_doppler:plots_loc_doppler+pilots_num_doppler-1, plots_loc_delay:plots_loc_delay+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
+                % calculate the invalid area in X_DD
+                self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
+                self.X_DD_invalid_delay_beg = plots_loc_delay - guard_delay_num_neg;
+                self.X_DD_invalid_delay_end = plots_loc_delay + pilots_num_delay - 1 + guard_delay_num_pos;
+                self.X_DD_invalid_doppl_beg = plots_loc_doppler - guard_doppler_num_neg;
+                self.X_DD_invalid_doppl_end = plots_loc_doppler + pilots_num_doppler - 1 + guard_doppler_num_pos;
+                assert(self.X_DD_invalid_num == (self.X_DD_invalid_delay_end - self.X_DD_invalid_delay_beg + 1)*(self.X_DD_invalid_doppl_end - self.X_DD_invalid_doppl_beg + 1));
             end
         end
 
@@ -248,28 +259,63 @@ classdef OTFS < handle
         % @symbols: a vector of symbols to send or a matrix of [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
         function modulate(self, symbols)
             % input check
-            if isvector(symbols)
-                if length(symbols) ~= self.nTimeslotNum*self.nSubcarNum
-                    error("The transmission symbol number must be %d", self.nTimeslotNum*self.nSubcarNum);
+            % input check - self.X_DD_invalid_num
+            if self.pilot_type ~= self.PILOT_NO && self.X_DD_invalid_num == 0
+                error("The modulation requires to insert pilots and guards first.");
+            end
+            data_num = self.nTimeslotNum*self.nSubcarNum - self.X_DD_invalid_num;
+            % input check - symbols
+            if ~isvector(symbols) && ~ismatrix(symbols)
+                error("The transmission symbol must be a vector or a matrix");
+            elseif isvector(symbols)
+                % input check - symbols - vector
+                if length(symbols) ~= data_num
+                    error("The transmission symbol number must be %d", data_num);
                 end
             elseif ismatrix(symbols) 
+                % input check - symbols - matrix
                 [sym_row_num, sym_col_num] = size(symbols);
                 if sym_row_num ~= self.nTimeslotNum || sym_col_num ~= self.nSubcarNum
                     error("The transmission symbol must be in the shape of (%d, %d)", self.nTimeslotNum, self.nSubcarNum);
                 end
-            else
-                error("The transmission symbol must be a vector or a matrix");
+                if data_num ~= self.nTimeslotNum*self.nSubcarNum
+                    if sum(abs(symbols(self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end, self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end)) >= eps) ~= 0
+                        error("The transmission symbols[%d:%d, %d:%d] must be zero", self.X_DD_invalid_doppl_beg, self.X_DD_invalid_doppl_end, self.X_DD_invalid_delay_beg, self.X_DD_invalid_delay_end);
+                    end
+                end
             end
             
             % modulate
             % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
             if isvector(symbols)
                 symbols = symbols(:);
-                self.X_DD = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
+                if data_num == self.nSubcarNum*self.nTimeslotNum
+                    self.X_DD = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
+                else
+                    symbols_id = 1;
+                    for doppl_id = 1:self.nTimeslotNum
+                        for delay_id = 1:self.nSubcarNum
+                            if doppl_id<self.X_DD_invalid_doppl_beg || doppl_id>self.X_DD_invalid_doppl_end || delay_id<self.X_DD_invalid_delay_beg || delay_id>self.X_DD_invalid_delay_end
+                                self.X_DD(doppl_id, delay_id) = symbols(symbols_id);
+                                symbols_id = symbols_id + 1;
+                            end
+                        end
+                    end
+                    assert(symbols_id - 1 == data_num);
+                end
             else
-                self.X_DD = symbols;
+                if data_num == self.nSubcarNum*self.nTimeslotNum
+                    self.X_DD = symbols;
+                else
+                    for doppl_id = 1:self.nTimeslotNum
+                        for delay_id = 1:self.nSubcarNum
+                            if ~ismember(doppl_id, self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end) && ~ismember(delay_id, self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end)
+                                self.X_DD(doppl_id, delay_id) = symbols(doppl_id, delay_id);
+                            end
+                        end
+                    end
+                end
             end
-            %self.X_DD = reshape(symbols, self.nTimeslotNum, self.nSubcarNum);
             % ISFFT 
             X_FT = fft(ifft(self.X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum);
             % X_TF is [nSubcarNum, nTimeslotNum]
@@ -279,9 +325,7 @@ classdef OTFS < handle
             % vectorize
             self.s = s_mat(:);
         end
-        
-        
-        
+
         % demodulate
         function yDD = demodulate(self)
             r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
