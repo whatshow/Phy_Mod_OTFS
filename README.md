@@ -39,7 +39,8 @@ All codes are uniform in matlab and python as a class. This section illustrate t
 * OTFS<br>
     `@nSubcarNum`: the subcarrier number<br>
     `@nTimeslotNum`: the timeslot number<br>
-    `@batch_size`**(optional)** : the batch size **(only used in python)**.<br>
+    `@batch_size`**(optional)** : the batch size **(only used in python)**.
+
     ```c, matlab, python
     nSubcarNum = 16;
     nTimeslotNum = 7;
