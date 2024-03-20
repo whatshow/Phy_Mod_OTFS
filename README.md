@@ -39,24 +39,48 @@ All codes are uniform in matlab and python as a class. This section illustrate t
 * OTFS<br>
     `@nSubcarNum`: the subcarrier number<br>
     `@nTimeslotNum`: the timeslot number<br>
+    `pilot_type`: pilot type<br>
+    `@pilot_loc_type`: pilot location type<br>
+    `@guard_type`: guard type<br>
+    `@detect_type`: detect type<br>
+    `@detect_csi_type`: detect CSI type<br>
     `@batch_size`**(optional)** : the batch size **(only used in python)**.
 
     ```c, matlab, python
     nSubcarNum = 16;
     nTimeslotNum = 7;
-    // initialise the class
+    // initialise the class (base)
     otfs = OTFS(nSubcarNum, nTimeslotNum);
-    // initialise the class using the batch (only used in python)
-    otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4);
+    otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4); // using the batch (only used in python)
+    // initialise the class (base + channel estimation + symbol detection)
+    otfs = OTFS(M, N, "pilot_type", OTFS.PILOT_SINGLE_SISO, "pilot_loc_type", OTFS.PILOT_LOC_CENTER, "GUARD_TYPE", OTFS.GUARD_REDUCED, "Detect_Type", OTFS.DETECT_MP_BASE);
+    ```
+* insertPilotsAndGuards<br>
+    `@pilots`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
+    `@pilots_pow`: pilot power to generate random pilots<br>
+    `@pilots_num_delay`: pilots number along the delay(Doppler) axis<br>
+    `@pilots_num_doppler`: pilots number along the Doppler(time) axis<br>
+    `@guard_delay_num_neg`: guard number negatively along the delay(frequency) axis<br>
+    `@guard_delay_num_pos`: guard number positively along the delay(frequency) axis<br>
+    `@guard_doppler_num_neg`: guard number negatively along the Doppler(time) axis<br>
+    `@guard_doppler_num_pos`: guard number positively along the Doppler(time) axis
+
+    ```c, matlab, python
+    SNR_p = 30; % dB
+    pil_pow = 10^(SNR_p/10);
+    lmax = 1;
+    kmax = 1;
+    pilots_num_delay = 2;
+    pilots_num_doppler = 2;
+    guard_delay_num_neg = lmax;
+    guard_delay_num_pos = lmax;
+    guard_doppl_num_neg = kmax*2;
+    guard_doppl_num_pos = kmax*2;
+    otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
     ```
 * modulate<br>
-    `@symbols`: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]<br>
-    ```matlab
-    % matlab
-    otfs.modulate(x_origin);
-    ```
-    ```python
-    # python
+    `@symbols`: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]
+    ```c, matlab, python
     otfs.modulate(x_origin);
     ```
 * setChannel<br>
