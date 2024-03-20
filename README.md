@@ -53,7 +53,8 @@ All codes are uniform in matlab and python as a class. This section illustrate t
     otfs = OTFS(nSubcarNum, nTimeslotNum);
     otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4); // using the batch (only used in python)
     // initialise the class (base + channel estimation + symbol detection)
-    otfs = OTFS(M, N, "pilot_type", OTFS.PILOT_SINGLE_SISO, "pilot_loc_type", OTFS.PILOT_LOC_CENTER, "GUARD_TYPE", OTFS.GUARD_REDUCED, "Detect_Type", OTFS.DETECT_MP_BASE);
+    otfs = OTFS(nSubcarNum, nTimeslotNum, "pilot_type", OTFS.PILOT_SINGLE_SISO, "pilot_loc_type", OTFS.PILOT_LOC_CENTER, "GUARD_TYPE", OTFS.GUARD_REDUCED, "Detect_Type", OTFS.DETECT_MP_BASE);
+    otfs = OTFS(nSubcarNum, nTimeslotNum, pilot_type=OTFS.PILOT_SINGLE_SISO, pilot_loc_type=OTFS.PILOT_LOC_CENTER, guard_type=OTFS.GUARD_REDUCED, detect_type=OTFS.DETECT_MP_BASE);
     ```
 * insertPilotsAndGuards<br>
     `@pilots`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
