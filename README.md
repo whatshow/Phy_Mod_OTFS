@@ -93,11 +93,9 @@ All codes are uniform in matlab and python as a class. This section illustrate t
         `@p`: the path number (scalar)<br>
         `@lmax`: the maximal integer delay index (scalar)<br>
         `@kmax`: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler<br>
-        ```matlab
+        ```c, matlab, python
         % matlab
         otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
-        ```
-        ```python
         # python
         otfs.setChannel(p=6, lmax=11, kmax=3);
         ```
@@ -105,16 +103,12 @@ All codes are uniform in matlab and python as a class. This section illustrate t
         `@gains:` the channel gains of [(batch_size), p]<br>
         `@delays:` the channel delays of [(batch_size), p]<br>
         `@dopplers`: the channel Doppler shift of [(batch_size), p]<br>
-        ```matlab
+        ```c, matlab, python
         % matlab
         otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
-        ```
-        ```python
         # python
-        # no batch
         otfs.setChannel(delays=[0, 1], dopplers=[2, 3], gains=[0.5, 0.5]);
-        # using batch
-        otfs.setChannel(delays=np.tile([0, 1], (batch_size, 1)), dopplers=np.tile([2, 3], (batch_size, 1)), gains=np.tile([0.5, 0.5], (batch_size, 1)));
+        otfs.setChannel(delays=np.tile([0, 1], (batch_size, 1)), dopplers=np.tile([2, 3], (batch_size, 1)), gains=np.tile([0.5, 0.5], (batch_size, 1))); # using batch
         ```
 * getChannel<br>
     return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
@@ -123,14 +117,12 @@ All codes are uniform in matlab and python as a class. This section illustrate t
     ```
 * passChannel<br>
     `@No`: a scalar of the linear noise power
-    ```python
-    # matlab & python
+    ```c, matlab, python
     otfs.passChannel(No);
     ```
 * demodulate<br>
     * return value: the vectorized received signal in the delay Doppler domain, a vector of [(batch_size), nSubcarNum*nTimeslotNum]
-    ```python
-    # matlab & python
+    ```c, matlab, python
     yDD = otfs.demodulate();
     ```
 ## Samples
