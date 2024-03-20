@@ -35,7 +35,7 @@ for id = 1:length(description)
     % set the channel
     otfs.setChannel("p", p, "kmax", DopplerValue(id), "lmax", lmax);
     H_DD = otfs.getChannel();
-    dopplers = otfs.getChannelDopplers();
+    [~, ~, dopplers] = otfs.getCSI();
     sigs_dopplers(id) = dopplers;
     % pass the channel
     otfs.passChannel(No);

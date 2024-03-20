@@ -31,7 +31,7 @@ parfor ifram = 1:N_fram
     data_temp = randi([0,1],N_bits_perfram,1);
     x_origin = qammod(data_temp, M_mod,'InputType','bit','UnitAveragePower',true);
     % init OTFS
-    otfs = OTFS(M, N, "Detect_Type", OTFS.DETECT_MP_BASE);
+    otfs = OTFS(M, N);
     % modulate
     otfs.modulate(x_origin);
     % set the channel
@@ -42,11 +42,9 @@ parfor ifram = 1:N_fram
     yDD = otfs.demodulate();
     % get CSI
     taps = 4;
-    chan_coef = otfs.getChannelGains();
-    delay_taps = otfs.getChannelDelays();
-    doppler_taps = otfs.getChannelDopplers();
+    [chan_coef,delay_taps,doppler_taps]  = otfs.getCSI();
     % detect
-    xDD_est = otfs.detect(No, sympool);
+    xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool);
     X_DD_est_viterbo = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,doppler_taps,chan_coef,No, otfs.getYDD(), "constellation", sympool);
     xDD_est_viterbo = X_DD_est_viterbo.';
     xDD_est_viterbo = xDD_est_viterbo(:);

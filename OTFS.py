@@ -18,13 +18,13 @@ class OTFS(object):
     PILOT_SINGLE_SISO = 1;                      # a single pilot for SISO case
     PILOT_TYPES = [PILOT_NO, PILOT_SINGLE_SISO];
     # Detect
-    DETECT_NO = 0;                              # no detection
     DETECT_MP_BASE = 1;                         # Base OTFS MP detector proposed by P. Raviteja in 2018
-    DETECT_TYPES = [DETECT_NO, DETECT_MP_BASE];
+    DETECT_TYPES = [DETECT_MP_BASE];
     # CSI
-    DETECT_CSI_PERFECT = 1;                     # perfect CSI
-    DETECT_CSI_CE = 2;                          # CSI from channel estimation (its type is based on pilot type) 
-    DETECT_CSI_TYPES = [DETECT_CSI_PERFECT, DETECT_CSI_CE];
+    DETECT_CSI_PERFECT = 10;                    # perfect CSI
+    DETECT_CSI_CE = 20;                         # CSI from channel estimation (its type is based on pilot type)
+    DETECT_CSI_IN = 30;                         # CSI from the input
+    DETECT_CSI_TYPES = [DETECT_CSI_PERFECT, DETECT_CSI_CE, DETECT_CSI_IN];
     # Batch
     BATCH_SIZE_NO = None;
     
@@ -43,13 +43,12 @@ class OTFS(object):
     r = None;                                   # Rx value in the time domain (array)
     Y_TF = None;                                # Rx value in the TF domain
     Y_DD = None;                                # Rx value in the DD domain
+    y_DD = None;                                # Rx value in the DD domain (vectorized)
     taps_num = 0;                               # paths number              
     delay_taps = None;                          # delay index, a row vector
     doppler_taps = None;                        # doppler index (integers or fractional numbers), a row vector
     chan_coef = None;                           # path gain, a row vector
     pilot_type = PILOT_NO;                      # pilot - type 
-    detect_type = DETECT_NO;                    # detect - type
-    detect_csi_type = DETECT_CSI_PERFECT;       # detect - CSI type
     
     ###########################################################################
     # General OTFS Methods
@@ -134,8 +133,8 @@ class OTFS(object):
         # SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
         self.Y_DD = np.fft.ifft(np.fft.fft(Y_FT, axis=-2), axis=-1)/np.sqrt(self.nTimeslotNum/self.nSubcarNum); 
         # return the DD domain vector (i.e., transpose->vectorization or reshape using 'C' order)
-        yDD = reshape(self.Y_DD, self.nSubcarNum*self.nTimeslotNum, batch_size=self.batch_size);
-        return yDD;
+        self.y_DD = reshape(self.Y_DD, self.nSubcarNum*self.nTimeslotNum, batch_size=self.batch_size);
+        return self.y_DD;
         
     '''
     set channel
@@ -274,6 +273,10 @@ class OTFS(object):
         return self.r;
     
     ###########################################################################
+    # Channel estimation
+    ###########################################################################
+    
+    ###########################################################################
     # OTFS Detectors
     ###########################################################################
     
@@ -407,7 +410,6 @@ class OTFS(object):
             return np.random.randn(*args);
         else:
             return np.random.randn(self.batch_size, *args);
-        
 
 ##############################################################################
 # Support Functions (only used in this model, please don't import)

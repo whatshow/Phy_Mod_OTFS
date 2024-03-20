@@ -35,7 +35,7 @@ Y_DD = reshape(yDD, M, N).';
 
 x = x_origin_DD(tap_pos_x, tap_pos_y);
 y = Y_DD(tap_pos_x + ki, tap_pos_y + li);
-gains = otfs.getChannelGains();
+[gains, ~, ~] = otfs.getCSI();
 h = gains(1);
 li_ki_est_rad = angle(y/h/x);
 if li_ki_est_rad > 0

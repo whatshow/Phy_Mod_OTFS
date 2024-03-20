@@ -28,7 +28,7 @@ data_temp = [3;3;2;3;0;2;2;0;1;2;1;1;3;3;2;0];
 x_origin = qammod(data_temp,M_mod,'gray', 'UnitAveragePower', true);
 
 % init OTFS
-otfs = OTFS(M, N, "Detect_Type", OTFS.DETECT_MP_BASE);
+otfs = OTFS(M, N);
 % modulate
 otfs.modulate(x_origin);
 % set the channel
@@ -42,7 +42,7 @@ r = otfs.passChannel(No);
 % demodulate
 yDD = otfs.demodulate();
 % detect
-xDD_est = otfs.detect(No, sympool);
+xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool);
 X_DD_est_viterbo = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,doppler_taps,chan_coef,No, otfs.getYDD(), "constellation", sympool);
 xDD_est_viterbo = X_DD_est_viterbo.';
 xDD_est_viterbo = xDD_est_viterbo(:);

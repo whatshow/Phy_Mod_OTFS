@@ -148,9 +148,12 @@ All codes are uniform in matlab and python as a class.
         `@hi`: the path gain (linear gain)<br>
         `@li`: the delay<br>
         `@ki`: the Doppler shift<br>
-    * getChannelGains(): get the channel gains<br>
-    * getChannelDelays(): get the channel delays<br>
-    * getChannelDopplers(): get the channel dopplers<br>
+    * getCSI(): get the channel state information, return [gains, delays, dopplers]<br>
+        `@sort_by_gain`: sort axis<br>
+        `@sort_by_delay_doppler`: sort axes<br>
+        `@sort_by_doppler_delay`: sort axes<br>
+        `@sort_ascend`: sort direction<br>
+        `@sort_descend`: sort direction
     * getX2DT(): get Tx signal in the Delay Time domain [(batch_size), delay, time]<br>
     * getX2TF(): get Tx signal in the TF domain [(batch_size), nSubcarNum, nTimeslotNum]<br>
     * getX2T(): get Tx signal in the time domain<br>

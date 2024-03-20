@@ -17,13 +17,13 @@ classdef OTFS < handle
         GUARD_REDUCED = 30;                         % guards take limited rows along the Doppler(time) axis
         GUARD_TYPES = [OTFS.GUARD_NO, OTFS.GUARD_ENTIRE, OTFS.GUARD_FULL, OTFS.GUARD_REDUCED];
         % Detect
-        DETECT_NO = 0;                              % no detection
-        DETECT_MP_BASE = 1;                         % base OTFS MP detector proposed by P. Raviteja in 2018
-        DETECT_TYPES = [OTFS.DETECT_NO, OTFS.DETECT_MP_BASE];
+        DETECT_MP_BASE = 10;                        % base OTFS MP detector proposed by P. Raviteja in 2018
+        DETECT_TYPES = [OTFS.DETECT_MP_BASE];
         % CSI
-        DETECT_CSI_PERFECT = 1;                     % perfect CSI
-        DETECT_CSI_CE = 2;                          % CSI from channel estimation (its type is based on pilot type)
-        DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE];
+        DETECT_CSI_PERFECT = 10;                    % perfect CSI
+        DETECT_CSI_CE = 20;                         % CSI from channel estimation (its type is based on pilot type)
+        DETECT_CSI_IN = 30;                         % CSI from the input
+        DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE, OTFS.DETECT_CSI_IN];
     end
     properties
         nSubcarNum {mustBeInteger}                  % subcarrier number
@@ -37,6 +37,7 @@ classdef OTFS < handle
         r                                           % Rx value in the time domain (array)
         Y_TF                                        % Rx value in the TF domain
         Y_DD                                        % Rx value in the DD domain
+        y_DD                                        % Rx value in the DD domain (vectorized)
         taps_num = 0                                % paths number              
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
@@ -64,9 +65,6 @@ classdef OTFS < handle
         ce_delay_taps                               % estimated delay index, a row vector
         ce_doppler_taps                             % estimated doppler index (integers or fractional numbers), a row vector
         ce_chan_coef                                % estimated path gain, a row vector
-        % detection
-        detect_type = OTFS.DETECT_NO;               % detect - type
-        detect_csi_type = OTFS.DETECT_CSI_PERFECT;  % detect - CSI type
     end
     
     methods
@@ -79,8 +77,6 @@ classdef OTFS < handle
         % @pilot_type:              pilot type
         % @pilot_loc_type:          pilot location type
         % @guard_type:              guard type
-        % @detect_type:             detect type
-        % @detect_csi_type:         detect CSI type
         function self = OTFS(nSubcarNum, nTimeslotNum, varargin)
             % Inputs Name-Value Pair 
             inPar = inputParser;
@@ -89,8 +85,6 @@ classdef OTFS < handle
             addParameter(inPar, "pilot_type", self.pilot_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.PILOT_TYPES));
             addParameter(inPar, "pilot_loc_type", self.pilot_loc_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.PILOT_LOC_TYPES));
             addParameter(inPar, "guard_type", self.guard_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.GUARD_TYPES));
-            addParameter(inPar, "detect_type", self.detect_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.DETECT_TYPES));
-            addParameter(inPar, "detect_csi_type", self.detect_csi_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.DETECT_CSI_TYPES));
             inPar.KeepUnmatched = true;                                          % Allow unmatched cases
             inPar.CaseSensitive = false;                                         % Allow capital or small characters
             
@@ -117,141 +111,6 @@ classdef OTFS < handle
             self.guard_type = inPar.Results.guard_type;
             if self.pilot_type == self.PILOT_NO && self.guard_type ~= self.GUARD_NO
                 error("Cannot allocate guards while not using pilots.");
-            end
-            % detect
-            self.detect_type = inPar.Results.detect_type;
-            % detect-CSI
-            self.detect_csi_type = inPar.Results.detect_csi_type;
-            if self.detect_type ~= self.DETECT_NO
-                if self.detect_csi_type == self.DETECT_CSI_CE && self.pilot_type == self.PILOT_NO
-                    error("Cannot detect symbols while use no pilot but need CSI from channel estiamtion.");
-                end
-            end
-        end
-        
-        % insert pilots and guards
-        % @pilots:                  a vector of your pilots (if given `pilots_pow` won't be used)
-        % @pilots_pow:              pilot power to generate random pilots
-        % @pilots_num_delay:        pilots number along the delay(Doppler) axis
-        % @pilots_num_doppler:      pilots number along the Doppler(time) axis
-        % @guard_delay_num_neg:     guard number negatively along the delay(frequency) axis
-        % @guard_delay_num_pos:     guard number positively along the delay(frequency) axis
-        % @guard_doppler_num_neg:   guard number negatively along the Doppler(time) axis
-        % @guard_doppler_num_pos:   guard number positively along the Doppler(time) axis
-        function insertPilotsAndGuards(self, pilots_num_delay, pilots_num_doppler, varargin)
-            % optional inputs 
-            inPar = inputParser;
-            addParameter(inPar, 'pilots', self.pilots, @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar, 'pilots_pow', NaN, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_delay_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_delay_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_doppler_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_doppler_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
-            inPar.KeepUnmatched = true;     % Allow unmatched cases
-            inPar.CaseSensitive = false;    % Allow capital or small characters
-            parse(inPar, varargin{:});
-            self.pilots = inPar.Results.pilots;
-            pilots_len = length(self.pilots);
-            pilots_pow = inPar.Results.pilots_pow;
-            guard_delay_num_neg = inPar.Results.guard_delay_num_neg;
-            guard_delay_num_pos = inPar.Results.guard_delay_num_pos;
-            guard_doppler_num_neg = inPar.Results.guard_doppler_num_neg;
-            guard_doppler_num_pos = inPar.Results.guard_doppler_num_pos;
-            
-            % input check - pilots
-            switch self.pilot_type
-                case self.PILOT_NO
-                    % overlap pilot settings
-                    pilots_num_delay = 0;
-                    pilots_num_doppler = 0;
-                    self.pilots = [];
-                otherwise
-                    if pilots_num_delay <= 0 || pilots_num_doppler <= 0
-                        error("Pilot number on each axis must be positive");
-                    elseif ~isempty(self.pilots)
-                        if pilots_len ~= pilots_num_delay*pilots_num_doppler
-                            error("The manual pilot input do not have the required number.");
-                        elseif pilots_len > self.nTimeslotNum*self.nSubcarNum
-                            error("The manual pilot input overflows (over the OTFS frame size).");
-                        end
-                    end
-            end
-            % input check - pilot power
-            if pilots_len == 0 && isnan(pilots_pow)
-                error("The pilots (linear) power is required while no manual pilot input.");
-            end
-            % input check - guard
-            switch self.guard_type
-                case self.GUARD_NO
-                    % overlap guard settings
-                    guard_delay_num_neg = 0;
-                    guard_delay_num_pos = 0;
-                    guard_doppler_num_neg = 0;
-                    guard_doppler_num_pos = 0;
-                case self.GUARD_ENTIRE
-                    % overlap guard settings
-                    guard_delay_num_neg = floor((self.nSubcarNum - pilots_num_delay)/2);
-                    guard_delay_num_pos = self.nSubcarNum - pilots_num_delay - guard_delay_num_neg;
-                    guard_doppler_num_neg = floor((self.nTimeslotNum - pilots_num_doppler)/2);
-                    guard_doppler_num_pos = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg;
-                case self.GUARD_FULL
-                    % overlap guard settings
-                    guard_doppler_num_neg = floor((self.nTimeslotNum - pilots_num_doppler)/2);
-                    guard_doppler_num_pos = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg;
-                case self.GUARD_REDUCED
-                    if guard_delay_num_neg <= 0 ||  guard_delay_num_pos <= 0 || guard_doppler_num_neg <= 0 || guard_doppler_num_pos <=0
-                        error("Guard number along the delay/Doppler axis must be positive.");
-                    end
-                    if floor(guard_delay_num_neg) ~= guard_delay_num_neg ||  floor(guard_delay_num_pos) ~= guard_delay_num_pos ||  floor(guard_doppler_num_neg) ~= guard_doppler_num_neg || floor(guard_doppler_num_pos) ~= guard_doppler_num_pos
-                        error("Guard number along the delay/Doppler axis must be integers.");
-                    end
-            end
-
-            % initiate X_DD if empty
-            if isempty(self.X_DD)
-                self.X_DD = zeros(self.nTimeslotNum, self.nSubcarNum);
-            end
-            % initiate pilots if empty
-            pilots_len = pilots_num_delay*pilots_num_doppler;
-            if isempty(self.pilots) && pilots_len > 0
-                switch self.pilot_type
-                    % SISO cases (only use ones)
-                    case {self.PILOT_SINGLE_SISO, self.PILOT_MULTIP_SISO}
-                        self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(pilots_len, 1);
-                end
-            end
-            % allocate pilots
-            if pilots_len == 0
-                % no pilots no operation
-                self.X_DD_invalid_num = 0;
-            else
-                % some pilots
-                % calulate the data number for two axises
-                data_delay_num = (self.nSubcarNum - pilots_num_delay - guard_delay_num_neg - guard_delay_num_pos);
-                data_doppler_num = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg - guard_doppler_num_pos;
-                % calculate the pilot start point shift due to asymmetric guards
-                pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
-                pilot_shift_doppler_pos = guard_doppler_num_pos - guard_doppler_num_neg;
-                % locate the 1st coordinates of the pilots (following the positive direction of axises)
-                plots_loc_delay = 0;
-                plots_loc_doppler = 0;
-                switch self.pilot_loc_type
-                    case self.PILOT_LOC_CENTER
-                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        plots_loc_doppler = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
-                    case self.PILOT_LOC_DELAY_MOST_CENTER 
-                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        plots_loc_doppler = data_doppler_num + guard_doppler_num_neg + 1;
-                end
-                % allocate pilots
-                self.X_DD(plots_loc_doppler:plots_loc_doppler+pilots_num_doppler-1, plots_loc_delay:plots_loc_delay+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
-                % calculate the invalid area in X_DD
-                self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
-                self.X_DD_invalid_delay_beg = plots_loc_delay - guard_delay_num_neg;
-                self.X_DD_invalid_delay_end = plots_loc_delay + pilots_num_delay - 1 + guard_delay_num_pos;
-                self.X_DD_invalid_doppl_beg = plots_loc_doppler - guard_doppler_num_neg;
-                self.X_DD_invalid_doppl_end = plots_loc_doppler + pilots_num_doppler - 1 + guard_doppler_num_pos;
-                assert(self.X_DD_invalid_num == (self.X_DD_invalid_delay_end - self.X_DD_invalid_delay_beg + 1)*(self.X_DD_invalid_doppl_end - self.X_DD_invalid_doppl_beg + 1));
             end
         end
 
@@ -337,6 +196,7 @@ classdef OTFS < handle
             % return the DD domain vector
             yDD = self.Y_DD.';
             yDD = yDD(:);
+            self.y_DD = yDD;
         end
 
         % set channel
@@ -498,12 +358,246 @@ classdef OTFS < handle
             r = self.r;
         end
         
+        %% Channel estimation
+        % insert pilots and guards
+        % @pilots:                  a vector of your pilots (if given `pilots_pow` won't be used)
+        % @pilots_pow:              pilot power to generate random pilots
+        % @pilots_num_delay:        pilots number along the delay(Doppler) axis
+        % @pilots_num_doppler:      pilots number along the Doppler(time) axis
+        % @guard_delay_num_neg:     guard number negatively along the delay(frequency) axis
+        % @guard_delay_num_pos:     guard number positively along the delay(frequency) axis
+        % @guard_doppler_num_neg:   guard number negatively along the Doppler(time) axis
+        % @guard_doppler_num_pos:   guard number positively along the Doppler(time) axis
+        function insertPilotsAndGuards(self, pilots_num_delay, pilots_num_doppler, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar, 'pilots', self.pilots, @(x) isvector(x)&&isnumeric(x));
+            addParameter(inPar, 'pilots_pow', NaN, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar, 'guard_delay_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar, 'guard_delay_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar, 'guard_doppler_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar, 'guard_doppler_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            self.pilots = inPar.Results.pilots;
+            pilots_len = length(self.pilots);
+            pilots_pow = inPar.Results.pilots_pow;
+            guard_delay_num_neg = inPar.Results.guard_delay_num_neg;
+            guard_delay_num_pos = inPar.Results.guard_delay_num_pos;
+            guard_doppler_num_neg = inPar.Results.guard_doppler_num_neg;
+            guard_doppler_num_pos = inPar.Results.guard_doppler_num_pos;
+            % input check
+            % input check - pilots
+            if self.pilot_type == self.PILOT_NO
+                % overwrite pilot settings
+                pilots_num_delay = 0;
+                pilots_num_doppler = 0;
+                self.pilots = [];
+            else
+                if pilots_num_delay <= 0 || pilots_num_doppler <= 0
+                    error("Pilot number on each axis must be positive");
+                elseif ~isempty(self.pilots)
+                    if pilots_len ~= pilots_num_delay*pilots_num_doppler
+                        error("The manual pilot input do not have the required number.");
+                    elseif pilots_len > self.nTimeslotNum*self.nSubcarNum
+                        error("The manual pilot input overflows (over the OTFS frame size).");
+                    end
+                end
+            end
+            % input check - pilot power
+            if pilots_len == 0 && isnan(pilots_pow)
+                error("The pilots (linear) power is required while no manual pilot input.");
+            end
+            % input check - guard
+            switch self.guard_type
+                case self.GUARD_NO
+                    % overwrite guard settings
+                    guard_delay_num_neg = 0;
+                    guard_delay_num_pos = 0;
+                    guard_doppler_num_neg = 0;
+                    guard_doppler_num_pos = 0;
+                case self.GUARD_ENTIRE
+                    % overwrite guard settings
+                    guard_delay_num_neg = floor((self.nSubcarNum - pilots_num_delay)/2);
+                    guard_delay_num_pos = self.nSubcarNum - pilots_num_delay - guard_delay_num_neg;
+                    guard_doppler_num_neg = floor((self.nTimeslotNum - pilots_num_doppler)/2);
+                    guard_doppler_num_pos = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg;
+                case self.GUARD_FULL
+                    % overwrite guard settings
+                    guard_doppler_num_neg = floor((self.nTimeslotNum - pilots_num_doppler)/2);
+                    guard_doppler_num_pos = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg;
+                case self.GUARD_REDUCED
+                    if guard_delay_num_neg <= 0 ||  guard_delay_num_pos <= 0 || guard_doppler_num_neg <= 0 || guard_doppler_num_pos <=0
+                        error("Guard number along the delay/Doppler axis must be positive.");
+                    end
+                    if floor(guard_delay_num_neg) ~= guard_delay_num_neg ||  floor(guard_delay_num_pos) ~= guard_delay_num_pos ||  floor(guard_doppler_num_neg) ~= guard_doppler_num_neg || floor(guard_doppler_num_pos) ~= guard_doppler_num_pos
+                        error("Guard number along the delay/Doppler axis must be integers.");
+                    end
+            end
+
+            % initiate X_DD if empty
+            if isempty(self.X_DD)
+                self.X_DD = zeros(self.nTimeslotNum, self.nSubcarNum);
+            end
+            % initiate pilots if empty
+            if isempty(self.pilots)
+                pilots_len = pilots_num_delay*pilots_num_doppler;
+                switch self.pilot_type
+                    % SISO cases (only use ones)
+                    case {self.PILOT_SINGLE_SISO, self.PILOT_MULTIP_SISO}
+                        self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(pilots_len, 1);
+                end
+            end
+            % allocate pilots
+            if pilots_len == 0
+                % no pilots no operation
+                self.X_DD_invalid_num = 0;
+            else
+                % some pilots
+                % calulate the data number for two axises
+                data_delay_num = (self.nSubcarNum - pilots_num_delay - guard_delay_num_neg - guard_delay_num_pos);
+                data_doppler_num = self.nTimeslotNum - pilots_num_doppler - guard_doppler_num_neg - guard_doppler_num_pos;
+                % calculate the pilot start point shift due to asymmetric guards
+                pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
+                pilot_shift_doppler_pos = guard_doppler_num_pos - guard_doppler_num_neg;
+                % locate the 1st coordinates of the pilots (following the positive direction of axises)
+                plots_loc_delay = 0;
+                plots_loc_doppler = 0;
+                switch self.pilot_loc_type
+                    case self.PILOT_LOC_CENTER
+                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        plots_loc_doppler = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
+                    case self.PILOT_LOC_DELAY_MOST_CENTER 
+                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        plots_loc_doppler = data_doppler_num + guard_doppler_num_neg + 1;
+                end
+                % allocate pilots
+                self.X_DD(plots_loc_doppler:plots_loc_doppler+pilots_num_doppler-1, plots_loc_delay:plots_loc_delay+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
+                % calculate the invalid area in X_DD
+                self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
+                self.X_DD_invalid_delay_beg = plots_loc_delay - guard_delay_num_neg;
+                self.X_DD_invalid_delay_end = plots_loc_delay + pilots_num_delay - 1 + guard_delay_num_pos;
+                self.X_DD_invalid_doppl_beg = plots_loc_doppler - guard_doppler_num_neg;
+                self.X_DD_invalid_doppl_end = plots_loc_doppler + pilots_num_doppler - 1 + guard_doppler_num_pos;
+                assert(self.X_DD_invalid_num == (self.X_DD_invalid_delay_end - self.X_DD_invalid_delay_beg + 1)*(self.X_DD_invalid_doppl_end - self.X_DD_invalid_doppl_beg + 1));
+            end
+            % calulate channel estimate area
+            if pilots_len > 0
+                switch self.guard_type
+                    case self.GUARD_ENTIRE
+                        self.ce_delay_beg = 1;
+                        self.ce_delay_end = self.nSubcarNum;
+                        self.ce_doppl_beg = 1;
+                        self.ce_doppl_end = self.nTimeslotNum;
+                    case self.GUARD_FULL
+                        self.ce_delay_beg = self.X_DD_invalid_delay_beg + guard_delay_num_neg;
+                        self.ce_delay_end = self.X_DD_invalid_delay_end;
+                        self.ce_doppl_beg = 1;
+                        self.ce_doppl_end = self.nTimeslotNum;
+                    case self.GUARD_REDUCED
+                        self.ce_delay_beg = self.X_DD_invalid_delay_beg + guard_delay_num_neg;
+                        self.ce_delay_end = self.X_DD_invalid_delay_end;
+                        self.ce_doppl_beg = self.X_DD_invalid_doppl_beg + floor(guard_doppler_num_neg/2);
+                        self.ce_doppl_end = self.X_DD_invalid_doppl_end - floor(guard_doppler_num_pos/2);
+                end
+            end
+        end
+        
+        % estimated the channel
+        % @threshold: the 
+        function [gains, delays, dopplers] = estimateChannel(self, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar, 'threshold', [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            threshold = inPar.Results.threshold;
+            % input check
+            % input check - pilot
+            if self.pilot_type == self.PILOT_NO
+                error("The channel estimation cannot be done because no pilot is in use.");
+            end
+            % input check - insert pilots & guards
+            if isnan(self.ce_delay_beg) || isnan(self.ce_delay_end) || isnan(self.ce_doppl_beg) || isnan(self.ce_doppl_end)
+                error("The pilot & guard allocation has to be done before channel estimation.");
+            end
+            % input check - demodulation
+            if isempty(self.Y_DD) || isempty(self.y_DD)
+                error("Demodulation has to be done before symbol detection.");
+            end
+            % input check - threshold
+            if ~isempty(threshold) && threshold < 0
+                error("The threshould must be non-negative.");
+            end
+            
+            % estimate the channel
+            gains = [];
+            delays = [];
+            dopplers = [];
+            for delay_id = self.ce_delay_beg:self.ce_delay_end
+                for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
+
+                end
+            end
+            
+        
+        end
+        
         %% OTFS Detectors
         % detect
-        % @No: estimated noise power (linear)
-        % @constellation: the constellation (a vector)
-        function symbols = detect(self, No, constellation, varargin)
+        % @detect_type:             detect type
+        % @csi_type:                detect CSI type
+        % @No:                      estimated noise power (linear)
+        % @constellation:           the constellation (a vector)
+        % @chan_coef:               the estimated channel gains
+        % @delay_taps:              the estimated channel delays
+        % @doppler_taps:            the estimated channel 
+        function symbols = detect(self, detect_type, csi_type, No, constellation, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"chan_coef", [], @isnumeric);
+            addParameter(inPar,"delay_taps", [], @isnumeric);
+            addParameter(inPar,"doppler_taps", [], @isnumeric);
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            chan_coef_est = inPar.Results.chan_coef;
+            delay_taps_est = inPar.Results.delay_taps;
+            doppler_taps_est = inPar.Results.doppler_taps;
             % input check
+            % input check - demodulation
+            if isempty(self.Y_DD) || isempty(self.y_DD)
+                error("Demodulation has to be done before symbol detection.");
+            end
+            % input check - detect_type
+            if ~isscalar(detect_type) && ~ismember(detect_type, self.DETECT_TYPES)
+                error("The detctor type is illegal.");
+            end
+            % input check - detect_csi_type
+            if ~isscalar(csi_type) && ~ismember(csi_type, self.DETECT_CSI_TYPES)
+                error("The channel state information source is illegal.");
+            end
+            if csi_type == self.DETECT_CSI_CE
+                if self.pilot_type == self.PILOT_NO
+                    error("Need CSI from channel estimation but no pilot is assigned.");
+                elseif isempty(self.ce_delay_taps) || isempty(self.ce_doppler_taps) || isempty(self.ce_chan_coef)
+                    error("Channel estimation has to be done before symbol detection.");
+                end
+            elseif csi_type == self.DETECT_CSI_IN
+                if ~isvector(chan_coef_est) || ~isvector(delay_taps_est) || ~isvector(doppler_taps_est)
+                    error("The input CSI (gains, delays and dopplers) must be vectors.");
+                end
+                chan_coef_est_len = length(chan_coef_est);
+                if chan_coef_est_len ~= length(delay_taps_est) || chan_coef_est_len ~= length(doppler_taps_est)
+                    error("The input CSI (gains, delays and dopplers) must have the same length.");
+                end
+            end
+            % input check - No
             if ~isscalar(No)
                 error("The noise power(linear) must be a scalar.");
             end
@@ -514,36 +608,20 @@ classdef OTFS < handle
                 constellation = constellation(:);
                 constellation = constellation.';
             end
-            % input check - optional
-            inPar = inputParser;
-            addParameter(inPar,"H_DD", [], @(x) isempty(x)||~isvector(x)&&ismatrix(x)&&isnumeric(x));
-            addParameter(inPar,"chan_coef", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            addParameter(inPar,"delay_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            addParameter(inPar,"doppler_taps", [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            inPar.KeepUnmatched = true;
-            inPar.CaseSensitive = false;
-            parse(inPar, varargin{:});
-            % take inputs
-            H_DD = inPar.Results.H_DD;
-            chan_coef = inPar.Results.chan_coef;
-            delay_taps = inPar.Results.delay_taps;
-            doppler_taps = inPar.Results.doppler_taps;
             
             % retrieve the channel information
-            switch self.detect_csi_type
+            switch csi_type
                 case self.DETECT_CSI_PERFECT
-                    chan_coef = self.chan_coef;
-                    delay_taps = self.delay_taps;
-                    doppler_taps = self.doppler_taps;
+                    chan_coef_est = self.chan_coef;
+                    delay_taps_est = self.delay_taps;
+                    doppler_taps_est = self.doppler_taps;
                 case self.DETECT_CSI_CE
                     
             end
             % estimate the symbols
-            switch self.detect_type
-                case self.DETECT_NO
-                    symbols = [];
+            switch detect_type
                 case self.DETECT_MP_BASE
-                    symbols = self.detectMPBase(No, constellation, chan_coef, delay_taps, doppler_taps);
+                    symbols = self.detectMPBase(No, constellation, chan_coef_est, delay_taps_est, doppler_taps_est);
             end
         end
         
@@ -734,17 +812,50 @@ classdef OTFS < handle
                 H_DD = H_DD + hi*Ti;
             end
         end
-        % get the channel delays
-        function delays = getChannelDelays(self)
-            delays = self.delay_taps;
-        end
-        % get the channel dopplers
-        function dopplers = getChannelDopplers(self)
-            dopplers = self.doppler_taps;
-        end
-        % get the channel gains
-        function gains = getChannelGains(self)
-            gains = self.chan_coef;
+        % get the channel state information
+        % @sort_by_gain: sort axis
+        % @sort_by_delay_doppler: sort axes
+        % @sort_by_doppler_delay: sort axes
+        % @descend: sort direction
+        function [gains, delays, dopplers] = getCSI(self, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"sort_by_gain", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"sort_by_delay_doppler", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"sort_by_doppler_delay", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"descend", false, @(x) isscalar(x)&&islogical(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            sort_by_gain = inPar.Results.sort_by_gain;
+            sort_by_delay_doppler = inPar.Results.sort_by_delay_doppler;
+            sort_by_doppler_delay = inPar.Results.sort_by_doppler_delay;
+            descend = inPar.Results.descend;
+            % input check
+            if sort_by_gain + sort_by_delay_doppler + sort_by_doppler_delay > 1
+                error("Cannot sort following over two orders.");
+            end
+            
+            % retrieve CSI
+            gains = self.chan_coef(:).';
+            delays = self.delay_taps(:).';
+            dopplers = self.doppler_taps(:).';
+            if sort_by_gain
+                [gains, sort_idx] = sort(gains, sort_direction);
+                delays = delays(sort_idx);
+                dopplers = dopplers(sort_idx);
+            elseif sort_by_delay_doppler
+                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 2, "second_order_arr", 3, "descend", descend);
+                gains = arrs_sorted(1, :);
+                delays = arrs_sorted(2, :);
+                dopplers = arrs_sorted(3, :);
+            elseif sort_by_doppler_delay
+                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 3, "second_order_arr", 2, "descend", descend);
+                gains = arrs_sorted(1, :);
+                delays = arrs_sorted(2, :);
+                dopplers = arrs_sorted(3, :);
+            end
         end
         % get the signal in the Delay Time domain [delay, time]
         function X_DT = getX2DT(self)
@@ -778,6 +889,76 @@ classdef OTFS < handle
         % get the received signal in delay Doppler domain
         function Y_DD = getYDD(self)
             Y_DD = self.Y_DD;
+        end
+        
+        % sort arrays based on the 
+        % @arrs:                arrays [arr_num, arr_data_num]
+        % @first_order_arr:     the 1st array id we follow the order
+        % @second_order_arr:    the 2nd array id we follow the order
+        % @descend:             descend order
+        function arrs = sortArrs(self, arrs, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"first_order_arr", false, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"second_order_arr", false, @(x) isscalar(x)&&isnumeric(x));
+            addParameter(inPar,"descend", false, @(x) isscalar(x)&&islogical(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            first_order_arr = inPar.Results.first_order_arr;
+            second_order_arr = inPar.Results.second_order_arr;
+            descend = inPar.Results.descend;
+            % input check
+            % input check - arrays
+            if isvector(arrs) || ~ismatrix(arrs)
+                error("Arrays must be given in a matrix form [arr_num, arr_data_num].");
+            end
+            [arr_num, arr_data_num] = size(arrs);
+            % input check - first_order_arr & second_order_arr
+            if first_order_arr < 0 || first_order_arr > arr_num || second_order_arr < 0 || second_order_arr > arr_num || first_order_arr == second_order_arr
+                error("The selected two arrays are illegal.");
+            end
+            
+            % retrieve 1st and 2nd arr
+            arr1 = arrs(first_order_arr, :);
+            arr2 = arrs(second_order_arr, :);
+            % sort - order
+            sort_direction = 'ascend';
+            if descend
+                sort_direction = 'descend';
+            end
+            % sort - 1st arr
+            [~, sort_idx_dim1] = sort(arr1, sort_direction);
+            for arr_id = 1:arr_num
+                cur_arr = arrs(arr_id, :);
+                arrs(arr_id, :) = cur_arr(sort_idx_dim1);
+            end
+            % sort - 2nd arr
+            arr_data_id = 1;
+            while arr_data_id <= arr_data_num
+                % find the beginning and the end of the segment
+                seg_beg = find(arr1, arr1(arr_data_id), "first");
+                seg_end = find(arr1, arr1(arr_data_id), "last");
+                % move to the next segment
+                arr_data_id = seg_end + 1;
+                % jump if there is only 1 element
+                if seg_beg == seg_end
+                    continue;
+                end
+                % segment - retrieve
+                seg_arr2 = arr2(seg_beg:seg_end);
+                % segment - sort
+                [~, sort_idx_dim2] = sort(seg_arr2, sort_direction);
+                % segments - sort
+                segs = arrs(:, seg_beg:seg_end);
+                for arr_id = 1:arr_num
+                    segs = segs(arr_id, :);
+                    segs(arr_id, :) = segs(sort_idx_dim2);
+                end
+                % arrs - sort
+                arrs(:, seg_beg:seg_end) = segs;
+            end
         end
     end
 end
