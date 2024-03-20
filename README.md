@@ -35,23 +35,18 @@ Currently, we offer three options to install this tool.
         ```
 
 ## How to use
-All OTFS codes are uniform in matlab and python as a class of `OTFS`. This class is the whole process of OTFS. This section will illustrate the methods of this class following the process from Tx to Rx.
+All codes are uniform in matlab and python as a class. This section illustrate the methods of the class following the process from Tx to Rx.
 * OTFS<br>
     `@nSubcarNum`: the subcarrier number<br>
     `@nTimeslotNum`: the timeslot number<br>
     `@batch_size`**(optional)** : the batch size **(only used in python)**.<br>
-    ```matlab
-    % matlab
+    ```c, matlab, python
     nSubcarNum = 16;
     nTimeslotNum = 7;
+    // initialise the class
     otfs = OTFS(nSubcarNum, nTimeslotNum);
-    ```
-    ```python
-    # python
-    nSubcarNum = 16;
-    nTimeslotNum = 7;
-    otfs = OTFS(nSubcarNum, nTimeslotNum);
-    otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4); # using batch
+    // initialise the class using the batch (only used in python)
+    otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4);
     ```
 * modulate<br>
     `@symbols`: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]<br>
