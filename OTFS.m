@@ -538,13 +538,22 @@ classdef OTFS < handle
             gains = [];
             delays = [];
             dopplers = [];
-            for delay_id = self.ce_delay_beg:self.ce_delay_end
-                for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
-
-                end
+            switch self.pilot_type
+                case self.PILOT_SINGLE_SISO
+                    for delay_id = self.ce_delay_beg:self.ce_delay_end
+                        for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
+                            tap_value = self.Y_DD(doppl_id, delay_id);
+                            if abs(tap_value) > threshold
+                                gains(end+1) = tap_value/self.pilots/exp(1j*2*pi*( - 1)*(k_id - pilot_loc_N)/M/N)
+                            sfsfs/ewew?>.43
+                            end
+                        end
+                    end
+                case self.PILOT_MULTIP_SISO
+                    error("Multiple pilots CE is not supported.");
             end
             
-        
+            
         end
         
         %% OTFS Detectors
