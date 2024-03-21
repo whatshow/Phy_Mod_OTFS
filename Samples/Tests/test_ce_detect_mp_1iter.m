@@ -46,22 +46,19 @@ otfs.modulate(x_origin);
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
 % pass the channel
 r = otfs.passChannel(No);
-r = otfs.passChannel(0);
 % demodulate
 yDD = otfs.demodulate();
 YDD = otfs.getYDD();
 % estimate the channel
-%[chan_coef_est, delay_taps_est, doppler_taps_est] = otfs.estimateChannel("threshold", pil_thr);
-[chan_coef_est, delay_taps_est, doppler_taps_est] = otfs.estimateChannel("threshold", 1e-10);
+[chan_coef_est, delay_taps_est, doppler_taps_est] = otfs.estimateChannel("threshold", pil_thr);
 [chan_coef, delay_taps, doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true);
 taps = length(chan_coef_est);
 % detect
-xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_CE, No, sympool);
-X_DD_est_viterbo = OTFS_mp_detector(N,M,M_mod,taps,delay_taps_est,doppler_taps_est,chan_coef_est,No, YDD, "constellation", sympool);
-xDD_est_viterbo = X_DD_est_viterbo.';
-xDD_est_viterbo = xDD_est_viterbo(:);
+xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_CE, No, sympool, "sym_map", true);
+xDD_est_perfect = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool, "sym_map", true);
 
-% difference
-xDD_est_diff = abs(xDD_est - xDD_est_viterbo);
-fprintf("The difference between Viterbo's base MP and ours is %.16f\n", sum(xDD_est_diff));
-
+% SER cal
+SER_Perfect = sum(xDD_est_perfect ~= x_origin)/N_syms_perfram;
+fprintf("SER (Perfect) %e\n", SER_Perfect);
+SER_CE = sum(xDD_est ~= x_origin)/N_syms_perfram;
+fprintf("SER (CE) %e\n", SER_CE);

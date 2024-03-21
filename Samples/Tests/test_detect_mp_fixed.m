@@ -12,7 +12,7 @@ clc;
 M_mod = 16;                                                                  % size of constellation
 M_bits = log2(M_mod);
 sympool = qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);               % Generate the symbol pool
-SNR = 10; % dB
+SNR = 20; % dB
 No = 1/10^(SNR/10); % linear
 %No = 0;
 
@@ -42,12 +42,13 @@ r = otfs.passChannel(No);
 % demodulate
 yDD = otfs.demodulate();
 % detect
-xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool);
+xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool, "sym_map", true);
 X_DD_est_viterbo = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,doppler_taps,chan_coef,No, otfs.getYDD(), "constellation", sympool);
 xDD_est_viterbo = X_DD_est_viterbo.';
 xDD_est_viterbo = xDD_est_viterbo(:);
 
 % difference
 xDD_est_diff = abs(xDD_est - xDD_est_viterbo);
-fprintf("The difference between Viterbo's base MP and ours is %.16f\n", sum(xDD_est_diff));
-
+fprintf("The difference between Viterbo's base MP and ours is %e\n", sum(xDD_est_diff));
+SER = sum(xDD_est~=x_origin)/M/N;
+fprintf("SER %e\n", sum(SER));

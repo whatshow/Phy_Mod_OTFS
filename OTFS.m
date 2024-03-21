@@ -31,7 +31,9 @@ classdef OTFS < handle
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
         chan_coef                                   % path gain, a row vector
-        % invalid area in X_DD (these parameters will be set after `insertPilotsAndGuards`)
+        % invalid area in X_DD
+        % (these parameters will be set after `insertPilotsAndGuards`)
+        % (these parameters will be used in `modulate`, `demodulate`, `detectMPBase`)
         X_DD_invalid_num = 0;
         X_DD_invalid_delay_beg = NaN;
         X_DD_invalid_delay_end = NaN;
@@ -53,6 +55,9 @@ classdef OTFS < handle
         ce_delay_taps                               % estimated delay index, a row vector
         ce_doppler_taps                             % estimated doppler index (integers or fractional numbers), a row vector
         ce_chan_coef                                % estimated path gain, a row vector
+        % detection
+        constellation                               % constellation
+        constellation_len = 0;
     end
     
     methods
@@ -168,9 +173,27 @@ classdef OTFS < handle
             Y_FT = self.Y_TF.';
             % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
             self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); 
-            % return the DD domain vector
-            yDD = self.Y_DD.';
-            yDD = yDD(:);
+            % vectorize
+            data_num = self.nTimeslotNum*self.nSubcarNum - self.X_DD_invalid_num;
+            yDD = zeros(data_num, 1);
+            if self.X_DD_invalid_num == 0
+                % no invalid area
+                yDD = self.Y_DD.';
+                yDD = yDD(:);
+            else
+                % return the invalid 
+                symbols_id = 1;
+                for doppl_id = 1:self.nTimeslotNum
+                    for delay_id = 1:self.nSubcarNum
+                        if doppl_id<self.X_DD_invalid_doppl_beg || doppl_id>self.X_DD_invalid_doppl_end || delay_id<self.X_DD_invalid_delay_beg || delay_id>self.X_DD_invalid_delay_end
+                            yDD(symbols_id) = self.Y_DD(doppl_id, delay_id);
+                            symbols_id = symbols_id + 1;
+                        end
+                    end
+                end
+                assert(symbols_id - 1 == data_num);
+            end
+            % store
             self.y_DD = yDD;
         end
 
@@ -533,12 +556,14 @@ classdef OTFS < handle
         % @chan_coef:               the estimated channel gains
         % @delay_taps:              the estimated channel delays
         % @doppler_taps:            the estimated channel 
+        % @sym_map:                 false by default. If true, the output will be mapped to the constellation
         function symbols = detect(self, detect_type, csi_type, No, constellation, varargin)
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar,"chan_coef", [], @isnumeric);
             addParameter(inPar,"delay_taps", [], @isnumeric);
             addParameter(inPar,"doppler_taps", [], @isnumeric);
+            addParameter(inPar,"sym_map", false, @(x) isscalar(x)&islogical(x)); 
             inPar.KeepUnmatched = true;
             inPar.CaseSensitive = false;
             parse(inPar, varargin{:});
@@ -546,6 +571,7 @@ classdef OTFS < handle
             chan_coef_est = inPar.Results.chan_coef;
             delay_taps_est = inPar.Results.delay_taps;
             doppler_taps_est = inPar.Results.doppler_taps;
+            sym_map = inPar.Results.sym_map;
             % input check
             % input check - demodulation
             if isempty(self.Y_DD) || isempty(self.y_DD)
@@ -582,23 +608,31 @@ classdef OTFS < handle
                 error("The constellation must be a vector.");
             else
                 % to row vector
-                constellation = constellation(:);
-                constellation = constellation.';
+                self.constellation = constellation(:).';
+                self.constellation_len = length(constellation);
             end
             
             % retrieve the channel information
-            switch csi_type
-                case self.DETECT_CSI_PERFECT
-                    chan_coef_est = self.chan_coef;
-                    delay_taps_est = self.delay_taps;
-                    doppler_taps_est = self.doppler_taps;
-                case self.DETECT_CSI_CE
-                    
+            if csi_type == self.DETECT_CSI_PERFECT
+                chan_coef_est = self.chan_coef;
+                delay_taps_est = self.delay_taps;
+                doppler_taps_est = self.doppler_taps;
+            end
+            if csi_type ==  self.DETECT_CSI_CE
+                chan_coef_est = self.ce_chan_coef;
+                delay_taps_est = self.ce_delay_taps;
+                doppler_taps_est = self.ce_doppler_taps;
             end
             % estimate the symbols
             switch detect_type
                 case self.DETECT_MP_BASE
-                    symbols = self.detectMPBase(No, constellation, chan_coef_est, delay_taps_est, doppler_taps_est);
+                    symbols = self.detectMPBase(No, chan_coef_est, delay_taps_est, doppler_taps_est);
+            end
+            % hard estimation
+            if sym_map
+                if detect_type ~= self.DETECT_MP_BASE
+                    symbols = self.symmap(symbols);
+                end
             end
         end
         
@@ -610,9 +644,8 @@ classdef OTFS < handle
         % @Doppler_taps:    the Doppler indices
         % @n_ite:           the iteration number (200 by default)
         % @delta_fra:       the percentage for taking the values in the current iteration
-        function symbols = detectMPBase(self, No, constellation, chan_coef, delay_taps, Doppler_taps, varargin)
+        function symbols = detectMPBase(self, No, chan_coef, delay_taps, Doppler_taps, varargin)
             % input check
-            constellation_len = length(constellation);
             if ~isvector(chan_coef)
                 error("The channel coefficient must be a vector.");
             end
@@ -642,13 +675,20 @@ classdef OTFS < handle
             yv = reshape(self.Y_DD, self.nTimeslotNum*self.nSubcarNum, 1);
             mean_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
             var_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
-            p_map = ones(self.nTimeslotNum*self.nSubcarNum,taps, constellation_len)*(1/constellation_len);
+            p_map = ones(self.nTimeslotNum*self.nSubcarNum,taps, self.constellation_len)*(1/self.constellation_len);
             % detect
             conv_rate_prev = -0.1;
             for ite=1:n_ite
                 % Update mean and var
                 for ele1=1:1:self.nSubcarNum
                     for ele2=1:1:self.nTimeslotNum
+                        % CE - jump the area for channel estimation
+                        if self.X_DD_invalid_num > 0
+                            if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                                continue;
+                            end
+                        end
+                        % origianl part
                         mean_int_hat = zeros(taps,1);
                         var_int_hat = zeros(taps,1);
                         for tap_no=1:taps
@@ -661,9 +701,9 @@ classdef OTFS < handle
                             end
                             new_chan = add_term * (add_term1) * chan_coef(tap_no);
 
-                            for i2=1:1:constellation_len
-                                mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * constellation(i2);
-                                var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(constellation(i2))^2;
+                            for i2=1:1:self.constellation_len
+                                mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * self.constellation(i2);
+                                var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(self.constellation(i2))^2;
                             end
                             mean_int_hat(tap_no) = mean_int_hat(tap_no) * new_chan;
                             var_int_hat(tap_no) = var_int_hat(tap_no) * abs(new_chan)^2;
@@ -681,15 +721,21 @@ classdef OTFS < handle
                     end
                 end
                 %% Update probabilities
-                sum_prob_comp = zeros(self.nTimeslotNum*self.nSubcarNum, constellation_len);
+                sum_prob_comp = zeros(self.nTimeslotNum*self.nSubcarNum, self.constellation_len);
                 dum_eff_ele1 = zeros(taps,1);
                 dum_eff_ele2 = zeros(taps,1);
                 for ele1=1:1:self.nSubcarNum
                     for ele2=1:1:self.nTimeslotNum
-                        dum_sum_prob = zeros(constellation_len,1);
-                        log_te_var = zeros(taps,constellation_len);
+                        % CE - jump the area for channel estimation
+                        if self.X_DD_invalid_num > 0
+                            if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                                continue;
+                            end
+                        end
+                        % original code
+                        dum_sum_prob = zeros(self.constellation_len,1);
+                        log_te_var = zeros(taps,self.constellation_len);
                         for tap_no=1:taps
-
                             if ele1+delay_taps(tap_no)<=self.nSubcarNum
                                 eff_ele1 = ele1 + delay_taps(tap_no);
                                 add_term = exp(1i*2*(pi/self.nSubcarNum)*(ele1-1)*(Doppler_taps(tap_no)/self.nTimeslotNum));
@@ -708,15 +754,15 @@ classdef OTFS < handle
 
                             dum_eff_ele1(tap_no) = eff_ele1;
                             dum_eff_ele2(tap_no) = eff_ele2;
-                            for i2=1:1:constellation_len
-                                dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * constellation(i2))^2;
+                            for i2=1:1:self.constellation_len
+                                dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * self.constellation(i2))^2;
                                 dum_sum_prob(i2)= -(dum_sum_prob(i2)/var_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no));
                             end
                             dum_sum = dum_sum_prob - max(dum_sum_prob);
                             dum1 = sum(exp(dum_sum));
                             log_te_var(tap_no,:) = dum_sum - log(dum1);
                         end
-                        for i2=1:1:constellation_len
+                        for i2=1:1:self.constellation_len
                             ln_qi(i2) = sum(log_te_var(:,i2));
                         end
                         dum_sum = exp(ln_qi - max(ln_qi));
@@ -730,9 +776,8 @@ classdef OTFS < handle
                             ln_qi_loc = ln_qi - dum_sum;
                             dum_sum = exp(ln_qi_loc - max(ln_qi_loc));
                             dum1 = sum(dum_sum);
-                            p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:) = (dum_sum/dum1)*delta_fra + (1-delta_fra)*reshape(p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:),1,constellation_len);
+                            p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:) = (dum_sum/dum1)*delta_fra + (1-delta_fra)*reshape(p_map(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no,:),1,self.constellation_len);
                         end
-
                     end
                 end
                 conv_rate =  sum(max(sum_prob_comp,[],2)>0.99)/(self.nTimeslotNum*self.nSubcarNum);
@@ -750,13 +795,54 @@ classdef OTFS < handle
             X_DD_est = zeros(self.nTimeslotNum, self.nSubcarNum);
             for ele1=1:1:self.nSubcarNum
                 for ele2=1:1:self.nTimeslotNum
+                    % CE - jump the area for channel estimation
+                    if self.X_DD_invalid_num > 0
+                        if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                            continue;
+                        end
+                    end
                     [~,pos] = max(sum_prob_fin(self.nTimeslotNum*(ele1-1)+ele2,:));
-                    X_DD_est(ele2,ele1) = constellation(pos);
+                    X_DD_est(ele2,ele1) = self.constellation(pos);
                 end
             end
             % extract symbols
-            symbols = X_DD_est.';
-            symbols = symbols(:);
+            data_num = self.nTimeslotNum*self.nSubcarNum - self.X_DD_invalid_num;
+            symbols = zeros(data_num, 1);
+            if self.X_DD_invalid_num == 0
+                % no invalid area
+                symbols = X_DD_est.';
+                symbols = symbols(:);
+            else
+                % return the invalid 
+                symbols_id = 1;
+                for doppl_id = 1:self.nTimeslotNum
+                    for delay_id = 1:self.nSubcarNum
+                        if doppl_id<self.X_DD_invalid_doppl_beg || doppl_id>self.X_DD_invalid_doppl_end || delay_id<self.X_DD_invalid_delay_beg || delay_id>self.X_DD_invalid_delay_end
+                            symbols(symbols_id) = X_DD_est(doppl_id, delay_id);
+                            symbols_id = symbols_id + 1;
+                        end
+                    end
+                end
+                assert(symbols_id - 1 == data_num);
+            end
+        end
+
+        % symbol mapping (hard)
+        % @syms: a vector of symbols
+        % @constellation: the constellation to map
+        function syms_mapped = symmap(self, syms)
+            if ~isvector(syms)
+                error("Symbols must be into a vector form to map.");
+            end
+            % the input must be a column vector
+            is_syms_col = iscolumn(syms);
+            syms = syms(:);
+            syms_dis = abs(syms - self.constellation).^2;
+            [~,syms_dis_min_idx] =  min(syms_dis,[],2);
+            syms_mapped = self.constellation(syms_dis_min_idx);
+            if is_syms_col
+                syms_mapped = syms_mapped(:);
+            end
         end
         
         %% support function
@@ -834,14 +920,17 @@ classdef OTFS < handle
                 dopplers = arrs_sorted(3, :);
             end
         end
+
         % get the signal in the Delay Time domain [delay, time]
         function X_DT = getX2DT(self)
             X_DT = ifft(self.X_DD).';
         end
+        
         % get the signal in the TF domain
         function X_TF = getX2TF(self)
             X_TF = self.X_TF;
         end
+        
         % get the signal in the time domain
         function s = getX2T(self, varargin)
             % Inputs Name-Value Pair 
@@ -863,6 +952,7 @@ classdef OTFS < handle
                 s = s_mat(:);
             end
         end
+        
         % get the received signal in delay Doppler domain
         function Y_DD = getYDD(self)
             Y_DD = self.Y_DD;
