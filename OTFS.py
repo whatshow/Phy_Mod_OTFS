@@ -13,12 +13,12 @@ from numpy.random import default_rng
 #        • set_transmission_symbols:                 
 class OTFS(object):
     # constants
-    # Pilot
-    PILOT_NO = 0;                               # no pilot
-    PILOT_SINGLE_SISO = 1;                      # a single pilot for SISO case
-    PILOT_TYPES = [PILOT_NO, PILOT_SINGLE_SISO];
+    # Pilot locations
+    PILOT_LOC_CENTER = 10;                      # the pilot is put at the center of frame
+    PILOT_LOC_DELAY_MOST_CENTER = 20;           # the pilot is put at the most delay area center
+    PILOT_LOC_TYPES = [PILOT_LOC_CENTER, PILOT_LOC_DELAY_MOST_CENTER];
     # Detect
-    DETECT_MP_BASE = 1;                         # Base OTFS MP detector proposed by P. Raviteja in 2018
+    DETECT_MP_BASE = 10;                        # base OTFS MP detector proposed by P. Raviteja in 2018
     DETECT_TYPES = [DETECT_MP_BASE];
     # CSI
     DETECT_CSI_PERFECT = 10;                    # perfect CSI
@@ -48,7 +48,28 @@ class OTFS(object):
     delay_taps = None;                          # delay index, a row vector
     doppler_taps = None;                        # doppler index (integers or fractional numbers), a row vector
     chan_coef = None;                           # path gain, a row vector
-    pilot_type = PILOT_NO;                      # pilot - type 
+    # invalid area in X_DD (these parameters will be set after `insertPilotsAndGuards`)
+    X_DD_invalid_num = 0;
+    X_DD_invalid_delay_beg = None;
+    X_DD_invalid_delay_end = None;
+    X_DD_invalid_doppl_beg = None;
+    X_DD_invalid_doppl_end = None;
+    # pilot
+    pilots = [];                                # pilots value
+    pilots_num_delay = 0;                       # pilots number along the delay(Doppler) axis
+    pilots_num_doppler = 0;                     # pilots number along the Doppler(time) axis
+    pilot_loc_delay_1st = 0;                    # 1st (lowest) pilot location in delay axis
+    pilot_loc_doppl_1st = 0;                    # 1st (lowest) pilot location in Doppler axis
+    # pilot location
+    pilot_loc_type = PILOT_LOC_CENTER;
+    # channel estimation
+    ce_delay_beg = None;
+    ce_delay_end = None;
+    ce_doppl_beg = None;
+    ce_doppl_end = None;
+    ce_delay_taps = [];                         # estimated delay index, a row vector
+    ce_doppler_taps = [];                       # estimated doppler index (integers or fractional numbers), a row vector
+    ce_chan_coef = [];                          # estimated path gain, a row vector
     
     ###########################################################################
     # General OTFS Methods
@@ -59,10 +80,7 @@ class OTFS(object):
     @nTimeslotNum:    timeslot number
     @freq_spacing:    frequency spacing (kHz), the default is 15kHz
     @fc:              single carrier frequency (GHz), the default is 3GHz
-    @pilot_type:      pilot type
-    @guard_type:      guard type
-    @detect_type:     detect type
-    @detect_csi_type: detect CSI type
+    @pilot_loc_type:  pilot type
     '''
     def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=None, fc=None, pilot_type=None, detect_type=None, detect_csi_type=None, batch_size = BATCH_SIZE_NO):
         if not isinstance(nSubcarNum, int):
@@ -79,17 +97,8 @@ class OTFS(object):
         if fc is not None:
             self.fc = fc;
         # pillot
-        if pilot_type is not None:
-            self.pilot_type = pilot_type;
-        # detect
-        if detect_type is not None:
-            self.detect_type = detect_type;
-        # detect-CSI
-        if detect_csi_type is not None:
-            self.detect_csi_type = detect_csi_type;
-        if self.detect_type != OTFS.DETECT_NO:
-            if self.detect_csi_type == OTFS.DETECT_CSI_CE and self.pilot_type == OTFS.PILOT_NO:
-                raise Exception("Cannot detect symbols while use no pilot but need CSI from channel estiamtion.");
+        if pilot_loc_type is not None:
+            self.pilot_loc_type = pilot_loc_type;
         # batch_size
         self.batch_size = batch_size;
     

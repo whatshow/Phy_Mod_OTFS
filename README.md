@@ -1,8 +1,10 @@
 # OTFS modulation
 [![PyPi](https://img.shields.io/badge/PyPi-1.0.1-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-1.0.1-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
 
-This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`.
+This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`. This repositiory is based on papers below:
+> 
 
+> Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
 ## How to install
 Currently, we offer three options to install this tool.
 * Install through `Matlab Add-Ons`
@@ -40,9 +42,7 @@ All codes are uniform in matlab and python as a class.
     * OTFS()<br>
         `@nSubcarNum`: the subcarrier number<br>
         `@nTimeslotNum`: the timeslot number<br>
-        `pilot_type`: pilot type<br>
         `@pilot_loc_type`: pilot location type<br>
-        `@guard_type`: guard type<br>
         `@batch_size`**(optional)** : the batch size **(only used in python)**.
     
         ```c, matlab, python
@@ -53,32 +53,27 @@ All codes are uniform in matlab and python as a class.
         otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4); # using the batch (only used in python)
         // initialise the class (base + channel estimation + symbol detection)
         % matlab
-        otfs = OTFS(nSubcarNum, nTimeslotNum, "pilot_type", OTFS.PILOT_SINGLE_SISO, "pilot_loc_type", OTFS.PILOT_LOC_CENTER, "GUARD_TYPE", OTFS.GUARD_REDUCED);
+        otfs = OTFS(nSubcarNum, nTimeslotNum, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
         # python
-        otfs = OTFS(nSubcarNum, nTimeslotNum, pilot_type=OTFS.PILOT_SINGLE_SISO, pilot_loc_type=OTFS.PILOT_LOC_CENTER, guard_type=OTFS.GUARD_REDUCED);
+        otfs = OTFS(nSubcarNum, nTimeslotNum, pilot_loc_type=OTFS.PILOT_LOC_CENTER);
         ```
     * insertPilotsAndGuards()<br>
         `@pilots`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
         `@pilots_pow`: pilot power to generate random pilots<br>
         `@pilots_num_delay`: pilots number along the delay(Doppler) axis<br>
         `@pilots_num_doppler`: pilots number along the Doppler(time) axis<br>
+        `guard_delay_full`: full guard on delay (if set true, ignore the number setting)<br>
         `@guard_delay_num_neg`: guard number negatively along the delay(frequency) axis<br>
         `@guard_delay_num_pos`: guard number positively along the delay(frequency) axis<br>
+        `@guard_doppler_full`: full guard on Doppler (if set true, ignore the number setting)<br>
         `@guard_doppler_num_neg`: guard number negatively along the Doppler(time) axis<br>
         `@guard_doppler_num_pos`: guard number positively along the Doppler(time) axis
     
         ```c, matlab, python
-        SNR_p = 30; % dB
-        pil_pow = 10^(SNR_p/10);
-        lmax = 1;
-        kmax = 1;
-        pilots_num_delay = 2;
-        pilots_num_doppler = 2;
-        guard_delay_num_neg = lmax;
-        guard_delay_num_pos = lmax;
-        guard_doppl_num_neg = kmax*2;
-        guard_doppl_num_pos = kmax*2;
-        otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
+        % matlab
+        otfs.insertPilotsAndGuards(2, 2, "pilots_pow", 1.2, "guard_delay_num_neg", 1, "guard_delay_num_pos", 1, "guard_doppler_num_neg", 2, "guard_doppler_num_pos", 2);
+        # python
+        otfs.insertPilotsAndGuards(2, 2, pilots_pow=1.2, guard_delay_num_neg=1, guard_delay_num_pos=1, guard_doppler_num_neg=2, guard_doppler_num_pos=2);
         ```
     * modulate()<br>
         `@symbols`: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]
@@ -170,7 +165,10 @@ All codes are uniform in matlab and python as a class.
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
     * `test_ce_case_01`: test all pilots allocation for **center pilots and reduced guard** (no noise)
+    * `test_ce_getcsi`: test `getCSI()` using `sort`
+    * `test_ce_detect_*`: test channel estimation and detection together
     * `test_detect_mp`: test MP detection methods
+    * `test_wf` & `test_wf_*`: test waveforms
 * TestFractionalDoppler
 * TestOTFSAllFunctions: test all functions using random channels and fixed channels
 * TestWaveForms
