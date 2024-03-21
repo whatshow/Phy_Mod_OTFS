@@ -912,6 +912,8 @@ classdef OTFS < handle
                 arrs(arr_id, :) = cur_arr(sort_idx_dim1);
             end
             % sort - 2nd arr
+            arr1 = arrs(first_order_arr, :);
+            arr2 = arrs(second_order_arr, :);
             arr_data_id = 1;
             while arr_data_id <= arr_data_num
                 % find the beginning and the end of the segment
@@ -930,8 +932,8 @@ classdef OTFS < handle
                 % segments - sort
                 segs = arrs(:, seg_beg:seg_end);
                 for arr_id = 1:arr_num
-                    segs = segs(arr_id, :);
-                    segs(arr_id, :) = segs(sort_idx_dim2);
+                    segs_row = segs(arr_id, :);
+                    segs(arr_id, :) = segs_row(sort_idx_dim2);
                 end
                 % arrs - sort
                 arrs(:, seg_beg:seg_end) = segs;

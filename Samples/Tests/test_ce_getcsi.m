@@ -10,7 +10,7 @@ sig_pow = 10^(SNR_d/10);
 N = 16;                          % time slot number
 M = 16;                          % subcarrier number
 % channel
-p = 4;
+p = 10;
 lmax = 2;
 kmax = 2;
 % pilot settings
@@ -50,4 +50,7 @@ YDD = otfs.getYDD();
 % estimate the channel
 %[chan_coef_est, delay_taps_est, doppler_taps_est] = otfs.estimateChannel("threshold", pil_thr);
 [chan_coef_est, delay_taps_est, doppler_taps_est] = otfs.estimateChannel("threshold", 1e-10);
-[chan_coef, delay_taps, doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true);
+[csi1_chan_coef, csi1_delay_taps, csi1_doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true);
+[csi2_chan_coef, csi2_delay_taps, csi2_doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true, "descend", true);
+[csi3_chan_coef, csi3_delay_taps, csi3_doppler_taps] = otfs.getCSI("sort_by_doppler_delay", true);
+[csi4_chan_coef, csi4_delay_taps, csi4_doppler_taps] = otfs.getCSI("sort_by_doppler_delay", true, "descend", true);
