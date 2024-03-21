@@ -53,6 +53,8 @@ classdef OTFS < handle
         pilots = [];                                % pilots value
         pilots_num_delay = 0;                       % pilots number along the delay(Doppler) axis
         pilots_num_doppler = 0;                     % pilots number along the Doppler(time) axis
+        pilot_loc_delay_1st = 0;                    % 1st (lowest) pilot location in delay axis
+        pilot_loc_doppl_1st = 0;                    % 1st (lowest) pilot location in Doppler axis
         % pilot location
         pilot_loc_type = OTFS.PILOT_LOC_CENTER;
         % guard
@@ -463,24 +465,24 @@ classdef OTFS < handle
                 pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
                 pilot_shift_doppler_pos = guard_doppler_num_pos - guard_doppler_num_neg;
                 % locate the 1st coordinates of the pilots (following the positive direction of axises)
-                plots_loc_delay = 0;
-                plots_loc_doppler = 0;
+                self.pilot_loc_delay_1st = 0;
+                self.pilot_loc_doppl_1st = 0;
                 switch self.pilot_loc_type
                     case self.PILOT_LOC_CENTER
-                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        plots_loc_doppler = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
+                        self.pilot_loc_delay_1st = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        self.pilot_loc_doppl_1st = floor(data_doppler_num/2) + guard_doppler_num_neg + pilot_shift_doppler_pos + 1;
                     case self.PILOT_LOC_DELAY_MOST_CENTER 
-                        plots_loc_delay = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        plots_loc_doppler = data_doppler_num + guard_doppler_num_neg + 1;
+                        self.pilot_loc_delay_1st = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
+                        self.pilot_loc_doppl_1st = data_doppler_num + guard_doppler_num_neg + 1;
                 end
                 % allocate pilots
-                self.X_DD(plots_loc_doppler:plots_loc_doppler+pilots_num_doppler-1, plots_loc_delay:plots_loc_delay+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
+                self.X_DD(self.pilot_loc_doppl_1st:self.pilot_loc_doppl_1st+pilots_num_doppler-1, self.pilot_loc_delay_1st:self.pilot_loc_delay_1st+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
                 % calculate the invalid area in X_DD
                 self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
-                self.X_DD_invalid_delay_beg = plots_loc_delay - guard_delay_num_neg;
-                self.X_DD_invalid_delay_end = plots_loc_delay + pilots_num_delay - 1 + guard_delay_num_pos;
-                self.X_DD_invalid_doppl_beg = plots_loc_doppler - guard_doppler_num_neg;
-                self.X_DD_invalid_doppl_end = plots_loc_doppler + pilots_num_doppler - 1 + guard_doppler_num_pos;
+                self.X_DD_invalid_delay_beg = self.pilot_loc_delay_1st - guard_delay_num_neg;
+                self.X_DD_invalid_delay_end = self.pilot_loc_delay_1st + pilots_num_delay - 1 + guard_delay_num_pos;
+                self.X_DD_invalid_doppl_beg = self.pilot_loc_doppl_1st - guard_doppler_num_neg;
+                self.X_DD_invalid_doppl_end = self.pilot_loc_doppl_1st + pilots_num_doppler - 1 + guard_doppler_num_pos;
                 assert(self.X_DD_invalid_num == (self.X_DD_invalid_delay_end - self.X_DD_invalid_delay_beg + 1)*(self.X_DD_invalid_doppl_end - self.X_DD_invalid_doppl_beg + 1));
             end
             % calulate channel estimate area
@@ -532,6 +534,8 @@ classdef OTFS < handle
             % input check - threshold
             if ~isempty(threshold) && threshold < 0
                 error("The threshould must be non-negative.");
+            elseif self.PILOT_SINGLE_SISO && (isempty(threshold) || threshold < 0)
+                error("The threshould must be non-negative for the current pilot type.");
             end
             
             % estimate the channel
@@ -542,18 +546,18 @@ classdef OTFS < handle
                 case self.PILOT_SINGLE_SISO
                     for delay_id = self.ce_delay_beg:self.ce_delay_end
                         for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
-                            tap_value = self.Y_DD(doppl_id, delay_id);
-                            if abs(tap_value) > threshold
-                                gains(end+1) = tap_value/self.pilots/exp(1j*2*pi*( - 1)*(k_id - pilot_loc_N)/M/N)
-                            sfsfs/ewew?>.43
+                            pss_y = self.Y_DD(doppl_id, delay_id);
+                            if abs(pss_y) > threshold
+                                pss_beta = exp(1j*2*pi*(self.pilot_loc_delay_1st - 1)/self.nSubcarNum*(doppl_id - self.pilot_loc_doppl_1st)/self.nTimeslotNum);
+                                gains(end+1) = pss_y/self.pilots/pss_beta;
+                                delays(end+1) = delay_id - self.pilot_loc_delay_1st;
+                                dopplers(end+1) = doppl_id - self.pilot_loc_doppl_1st;
                             end
                         end
                     end
                 case self.PILOT_MULTIP_SISO
                     error("Multiple pilots CE is not supported.");
             end
-            
-            
         end
         
         %% OTFS Detectors

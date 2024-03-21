@@ -58,6 +58,9 @@ X_DD2 = otfs.X_DD;
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
 H_DD2 = otfs.getChannel();
 otfs.passChannel(No);
+otfs.demodulate();
+[gains2_est, delays2_est, dopplers2_est] = otfs.estimateChannel("threshold", 1e-10);
+[gains2, delays2, dopplers2] = otfs.getCSI();
 
 %% test center - reduced guard - odd size - even pilot number
 N = 7;
