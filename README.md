@@ -122,6 +122,7 @@ All codes are uniform in matlab and python as a class.
     * estimateChannel(): estimate the channel state information based.<br>
         The algorithm for SISO single pilot is implemented in **III. EMBEDDED CHANNEL ESTIMATION FOR POINT-TO-POINT SISO CASE**, **C. OTFS With Rectangular Waveforms**
         > Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
+        
         `@threshold:` the threshold of detecting a path
     * detect(): detect the symbols from received signal<br>
         `@detect_type`: detect type<br>
