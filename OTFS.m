@@ -63,8 +63,8 @@ classdef OTFS < handle
         constellation_len = 0;
     end
     
-    methods
-        %% General OTFS Methods
+    % General OTFS Methods
+    methods   
         %{
         constructor
         @nSubcarNum:              subcarrier number
@@ -105,7 +105,7 @@ classdef OTFS < handle
         
         %{
         modulate
-        @symbols: a vector of symbols to send or a matrix of [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
+        @symbols: a vector of symbols to send or a matrix of [Doppler, delay] or [nTimeslotNum ,nSubcarNum] (the pilots & guards area must be empty)
         %}
         function modulate(self, symbols)
             % input check
@@ -363,7 +363,6 @@ classdef OTFS < handle
             r = self.r;
         end
         
-        %% Channel estimation
         %{
         insert pilots and guards
         @pilots:                  a vector of your pilots (if given `pilots_pow` won't be used)
@@ -503,8 +502,10 @@ classdef OTFS < handle
             end
         end
         
+        %{
         % estimated the channel
-        % @threshold: the 
+        % @threshold: the threshold to detect a path
+        %}
         function [gains, delays, dopplers] = estimateChannel(self, varargin)
             % optional inputs - register
             inPar = inputParser;
@@ -551,16 +552,17 @@ classdef OTFS < handle
             dopplers = self.ce_doppler_taps;
         end
         
-        %% OTFS Detectors
-        % detect
-        % @detect_type:             detect type
-        % @csi_type:                detect CSI type
-        % @No:                      estimated noise power (linear)
-        % @constellation:           the constellation (a vector)
-        % @chan_coef:               the estimated channel gains
-        % @delay_taps:              the estimated channel delays
-        % @doppler_taps:            the estimated channel 
-        % @sym_map:                 false by default. If true, the output will be mapped to the constellation
+        %{
+        detect
+        @detect_type:             detect type
+        @csi_type:                detect CSI type
+        @No:                      estimated noise power (linear)
+        @constellation:           the constellation (a vector)
+        @chan_coef:               the estimated channel gains
+        @delay_taps:              the estimated channel delays
+        @doppler_taps:            the estimated channel 
+        @sym_map:                 false by default. If true, the output will be mapped to the constellation
+        %}
         function symbols = detect(self, detect_type, csi_type, No, constellation, varargin)
             % optional inputs - register
             inPar = inputParser;
@@ -639,15 +641,207 @@ classdef OTFS < handle
                 end
             end
         end
+    end
+    
+    %% Getters & Setters
+    methods
+        %{
+        Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
+        @chan_coef:         the channel gains
+        @delay_taps:        the channel delays
+        @doppler_taps:      the channel Dopplers
+        @only_for_data:     whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
+        %}
+        function H_DD = getChannel(self, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"chan_coef", [], @(x) isvector(x)&&isnumeric(x));
+            addParameter(inPar,"delay_taps", [], @(x) isvector(x)&&isnumeric(x));
+            addParameter(inPar,"doppler_taps", [], @(x) isvector(x)&&isnumeric(x));
+            addParameter(inPar,"only_for_data", true, @(x) isscalar(x)&&islogical(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            in_chan_coef = inPar.Results.chan_coef;
+            in_delay_taps = inPar.Results.delay_taps;
+            in_doppler_taps = inPar.Results.doppler_taps;
+            only_for_data = inPar.Results.only_for_data;
+            % input check
+            % input check - csi
+            csi_cond = sum(~isempty(in_chan_coef) + ~isempty(in_delay_taps) + ~isempty(in_doppler_taps));
+            if csi_cond == 1 || csi_cond == 2
+                error("If you give CSI, you have to give channel gains, delays and Dopplers together.");
+            end
+            if csi_cond == 3
+                in_chan_coef_len = length(in_chan_coef);
+                if in_chan_coef_len ~= length(in_delay_taps) && in_chan_coef_len ~= length(in_doppler_taps)
+                    error("The input CSI (gains, delays and dopplers) must have the same length.");
+                end
+            end
+            
+            % reset the CSI if not input
+            if csi_cond == 0
+                in_chan_coef = self.chan_coef;
+                in_delay_taps = self.delay_taps;
+                in_doppler_taps = self.doppler_taps;
+            end
+            % build H_DD
+            H_DD = zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum); % intialize the return channel
+            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum); % DFT matrix
+            idftmat = conj(dftmat); % IDFT matrix 
+            piMat = eye(self.nTimeslotNum*self.nSubcarNum); % permutation matrix (from the delay) -> pi
+            % accumulate all paths
+            for tap_id = 1:self.taps_num
+                hi = in_chan_coef(tap_id);
+                li = in_delay_taps(tap_id);
+                ki = in_doppler_taps(tap_id);
+                % delay
+                piMati = circshift(piMat, li); 
+                % Doppler
+                deltaMat_diag = exp(1j*2*pi*ki/(self.nTimeslotNum*self.nSubcarNum)*(0:1:self.nTimeslotNum*self.nSubcarNum-1));
+                deltaMati = diag(deltaMat_diag);
+                % Pi, Qi, & Ti
+                Pi = kron(dftmat, eye(self.nSubcarNum))*piMati; 
+                Qi = deltaMati*kron(idftmat, eye(self.nSubcarNum));
+                Ti = Pi*Qi;
+                H_DD = H_DD + hi*Ti;
+            end
+            % remove redundant values
+            if self.isInsertPilotsAndGuards() && only_for_data
+                invalud_row = NaN(1, self.nSubcarNum*self.nTimeslotNum);
+                invalud_col = NaN(self.nSubcarNum*self.nTimeslotNum, 1);
+                % mark redundant values - columns (X_DD invalid)
+                for doppl_id = self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end
+                    for delay_id = self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end
+                        col_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
+                        H_DD(:, col_id) = invalud_col;
+                    end
+                end
+                % mark redundant values - rows (Y_DD invalid)
+                for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
+                    for delay_id = self.ce_delay_beg:self.ce_delay_end
+                        row_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
+                        H_DD(row_id, :) = invalud_row;
+                    end
+                end
+                % remove redundant values
+                % remove redundant values - columns
+                col_idx = sum(isnan(H_DD)) == self.nSubcarNum*self.nTimeslotNum;
+                H_DD(:, col_idx) = [];
+                % remove - rows
+                [~, H_DD_col_num] = size(H_DD);
+                row_idx = sum(isnan(H_DD), 2) == H_DD_col_num;
+                H_DD(row_idx, :) = [];
+            end
+        end
         
-        % MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
-        % @No:              the estimated noise power
-        % @constellation:   the constellation (a vector)
-        % @chan_coef:       the channel coefficient
-        % @delay_taps:      the delay indices
-        % @Doppler_taps:    the Doppler indices
-        % @n_ite:           the iteration number (200 by default)
-        % @delta_fra:       the percentage for taking the values in the current iteration
+        %{
+        get the channel state information
+        @sort_by_gain: sort axis
+        @sort_by_delay_doppler: sort axes
+        @sort_by_doppler_delay: sort axes
+        @descend: sort direction
+        %}
+        function [gains, delays, dopplers] = getCSI(self, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"sort_by_gain", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"sort_by_delay_doppler", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"sort_by_doppler_delay", false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"descend", false, @(x) isscalar(x)&&islogical(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            % optional inputs - assign
+            sort_by_gain = inPar.Results.sort_by_gain;
+            sort_by_delay_doppler = inPar.Results.sort_by_delay_doppler;
+            sort_by_doppler_delay = inPar.Results.sort_by_doppler_delay;
+            descend = inPar.Results.descend;
+            % input check
+            if sort_by_gain + sort_by_delay_doppler + sort_by_doppler_delay > 1
+                error("Cannot sort following over two orders.");
+            end
+            
+            % retrieve CSI
+            gains = self.chan_coef(:).';
+            delays = self.delay_taps(:).';
+            dopplers = self.doppler_taps(:).';
+            if sort_by_gain
+                [gains, sort_idx] = sort(gains, sort_direction);
+                delays = delays(sort_idx);
+                dopplers = dopplers(sort_idx);
+            elseif sort_by_delay_doppler
+                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 2, "second_order_arr", 3, "descend", descend);
+                gains = arrs_sorted(1, :);
+                delays = arrs_sorted(2, :);
+                dopplers = arrs_sorted(3, :);
+            elseif sort_by_doppler_delay
+                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 3, "second_order_arr", 2, "descend", descend);
+                gains = arrs_sorted(1, :);
+                delays = arrs_sorted(2, :);
+                dopplers = arrs_sorted(3, :);
+            end
+        end
+        
+        %{
+        get the signal in the Delay Time domain [delay, time]
+        %}
+        function X_DT = getX2DT(self)
+            X_DT = ifft(self.X_DD).';
+        end
+        
+        %{
+        get the signal in the TF domain
+        %}
+        function X_TF = getX2TF(self)
+            X_TF = self.X_TF;
+        end
+        
+        %{
+        get the signal in the time domain
+        %}
+        function s = getX2T(self, varargin)
+            % Inputs Name-Value Pair 
+            inPar = inputParser;
+            addParameter(inPar,'fft_size', 0, @isnumeric);
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            % freq_spacing & fc
+            parse(inPar, varargin{:}); 
+            fft_size = inPar.Results.fft_size;
+            
+            % if fft resolution is lower than subcarrier number, we choose the subcarrier number as the resolution
+            if fft_size < self.nSubcarNum
+                s = self.s;
+            else 
+                % Heisenberg transform
+                s_mat = ifft(self.X_TF, fft_size)*sqrt(self.nSubcarNum);
+                % vectorize
+                s = s_mat(:);
+            end
+        end
+        
+        %{
+        get the received signal in delay Doppler domain
+        %}
+        function Y_DD = getYDD(self)
+            Y_DD = self.Y_DD;
+        end
+    end
+    
+    %% detectors
+    methods(Access=private)
+        %{
+        MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
+        @No:              the estimated noise power
+        @constellation:   the constellation (a vector)
+        @chan_coef:       the channel coefficient
+        @delay_taps:      the delay indices
+        @Doppler_taps:    the Doppler indices
+        @n_ite:           the iteration number (200 by default)
+        @delta_fra:       the percentage for taking the values in the current iteration
+        %}
         function symbols = detectMPBase(self, No, chan_coef, delay_taps, Doppler_taps, varargin)
             % input check
             if ~isvector(chan_coef)
@@ -829,100 +1023,10 @@ classdef OTFS < handle
                 end
             end
         end
-        
-        %% Getters & Setters
-        % get the channel state information
-        % @sort_by_gain: sort axis
-        % @sort_by_delay_doppler: sort axes
-        % @sort_by_doppler_delay: sort axes
-        % @descend: sort direction
-        function [gains, delays, dopplers] = getCSI(self, varargin)
-            % optional inputs - register
-            inPar = inputParser;
-            addParameter(inPar,"sort_by_gain", false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar,"sort_by_delay_doppler", false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar,"sort_by_doppler_delay", false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar,"descend", false, @(x) isscalar(x)&&islogical(x));
-            inPar.KeepUnmatched = true;
-            inPar.CaseSensitive = false;
-            parse(inPar, varargin{:});
-            % optional inputs - assign
-            sort_by_gain = inPar.Results.sort_by_gain;
-            sort_by_delay_doppler = inPar.Results.sort_by_delay_doppler;
-            sort_by_doppler_delay = inPar.Results.sort_by_doppler_delay;
-            descend = inPar.Results.descend;
-            % input check
-            if sort_by_gain + sort_by_delay_doppler + sort_by_doppler_delay > 1
-                error("Cannot sort following over two orders.");
-            end
-            
-            % retrieve CSI
-            gains = self.chan_coef(:).';
-            delays = self.delay_taps(:).';
-            dopplers = self.doppler_taps(:).';
-            if sort_by_gain
-                [gains, sort_idx] = sort(gains, sort_direction);
-                delays = delays(sort_idx);
-                dopplers = dopplers(sort_idx);
-            elseif sort_by_delay_doppler
-                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 2, "second_order_arr", 3, "descend", descend);
-                gains = arrs_sorted(1, :);
-                delays = arrs_sorted(2, :);
-                dopplers = arrs_sorted(3, :);
-            elseif sort_by_doppler_delay
-                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 3, "second_order_arr", 2, "descend", descend);
-                gains = arrs_sorted(1, :);
-                delays = arrs_sorted(2, :);
-                dopplers = arrs_sorted(3, :);
-            end
-        end
-        
-        %{
-        get the signal in the Delay Time domain [delay, time]
-        %}
-        function X_DT = getX2DT(self)
-            X_DT = ifft(self.X_DD).';
-        end
-        
-        %{
-        get the signal in the TF domain
-        %}
-        function X_TF = getX2TF(self)
-            X_TF = self.X_TF;
-        end
-        
-        %{
-        get the signal in the time domain
-        %}
-        function s = getX2T(self, varargin)
-            % Inputs Name-Value Pair 
-            inPar = inputParser;
-            addParameter(inPar,'fft_size', 0, @isnumeric);
-            inPar.KeepUnmatched = true;     % Allow unmatched cases
-            inPar.CaseSensitive = false;    % Allow capital or small characters
-            % freq_spacing & fc
-            parse(inPar, varargin{:}); 
-            fft_size = inPar.Results.fft_size;
-            
-            % if fft resolution is lower than subcarrier number, we choose the subcarrier number as the resolution
-            if fft_size < self.nSubcarNum
-                s = self.s;
-            else 
-                % Heisenberg transform
-                s_mat = ifft(self.X_TF, fft_size)*sqrt(self.nSubcarNum);
-                % vectorize
-                s = s_mat(:);
-            end
-        end
-        
-        %{
-        get the received signal in delay Doppler domain
-        %}
-        function Y_DD = getYDD(self)
-            Y_DD = self.Y_DD;
-        end
-        
-        %% private methods
+    end
+    
+    %% support functions - general
+    methods(Access=private)
         %{
         check whether the pilots & guards are inserted or not
         %}
@@ -934,99 +1038,12 @@ classdef OTFS < handle
             % check whether CE area is calulated
             is_done = is_done && ~isnan(self.ce_delay_beg) && ~isnan(self.ce_delay_end) && ~isnan(self.ce_doppl_beg) && ~isnan(self.ce_doppl_end);
         end
-        
+           
         %{
-        Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
-        @chan_coef:         the channel gains
-        @delay_taps:        the channel delays
-        @doppler_taps:      the channel Dopplers
-        @data_only:         whether the channel only includes the data part (this requires running ``)
+        symbol mapping (hard)
+        @syms: a vector of symbols
+        @constellation: the constellation to map
         %}
-        function H_DD = getChannel(self, varargin)
-            % optional inputs - register
-            inPar = inputParser;
-            addParameter(inPar,"chan_coef", [], @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar,"delay_taps", [], @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar,"doppler_taps", [], @(x) isvector(x)&&isnumeric(x));
-            inPar.KeepUnmatched = true;
-            inPar.CaseSensitive = false;
-            parse(inPar, varargin{:});
-            % optional inputs - assign
-            in_chan_coef = inPar.Results.chan_coef;
-            in_delay_taps = inPar.Results.delay_taps;
-            in_doppler_taps = inPar.Results.doppler_taps;
-            % input check
-            % input check - csi
-            csi_cond = sum(~isempty(in_chan_coef) + ~isempty(in_delay_taps) + ~isempty(in_doppler_taps));
-            if csi_cond == 1 || csi_cond == 2
-                error("If you give CSI, you have to give channel gains, delays and Dopplers together.");
-            end
-            if csi_cond == 3
-                in_chan_coef_len = length(in_chan_coef);
-                if in_chan_coef_len ~= length(in_delay_taps) && in_chan_coef_len ~= length(in_doppler_taps)
-                    error("The input CSI (gains, delays and dopplers) must have the same length.");
-                end
-            end
-            
-            % reset the CSI if not input
-            if csi_cond == 0
-                in_chan_coef = self.chan_coef;
-                in_delay_taps = self.delay_taps;
-                in_doppler_taps = self.doppler_taps;
-            end
-            % build H_DD
-            H_DD = zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum); % intialize the return channel
-            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum); % DFT matrix
-            idftmat = conj(dftmat); % IDFT matrix 
-            piMat = eye(self.nTimeslotNum*self.nSubcarNum); % permutation matrix (from the delay) -> pi
-            % accumulate all paths
-            for tap_id = 1:self.taps_num
-                hi = in_chan_coef(tap_id);
-                li = in_delay_taps(tap_id);
-                ki = in_doppler_taps(tap_id);
-                % delay
-                piMati = circshift(piMat, li); 
-                % Doppler
-                deltaMat_diag = exp(1j*2*pi*ki/(self.nTimeslotNum*self.nSubcarNum)*(0:1:self.nTimeslotNum*self.nSubcarNum-1));
-                deltaMati = diag(deltaMat_diag);
-                % Pi, Qi, & Ti
-                Pi = kron(dftmat, eye(self.nSubcarNum))*piMati; 
-                Qi = deltaMati*kron(idftmat, eye(self.nSubcarNum));
-                Ti = Pi*Qi;
-                H_DD = H_DD + hi*Ti;
-            end
-            % remove redundant values
-            if self.isInsertPilotsAndGuards()
-                invalud_row = NaN(1, self.nSubcarNum*self.nTimeslotNum);
-                invalud_col = NaN(self.nSubcarNum*self.nTimeslotNum, 1);
-                % mark redundant values - columns (X_DD invalid)
-                for doppl_id = self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end
-                    for delay_id = self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end
-                        col_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
-                        H_DD(:, col_id) = invalud_col;
-                    end
-                end
-                % mark redundant values - rows (Y_DD invalid)
-                for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
-                    for delay_id = self.ce_delay_beg:self.ce_delay_end
-                        row_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
-                        H_DD(row_id, :) = invalud_row;
-                    end
-                end
-                % remove redundant values
-                % remove redundant values - columns
-                col_idx = sum(isnan(H_DD)) == self.nSubcarNum*self.nTimeslotNum;
-                H_DD(:, col_idx) = [];
-                % remove - rows
-                [~, H_DD_col_num] = size(H_DD);
-                row_idx = sum(isnan(H_DD), 2) == H_DD_col_num;
-                H_DD(row_idx, :) = [];
-            end
-        end
-        
-        % symbol mapping (hard)
-        % @syms: a vector of symbols
-        % @constellation: the constellation to map
         function syms_mapped = symmap(self, syms)
             if ~isvector(syms)
                 error("Symbols must be into a vector form to map.");
@@ -1041,13 +1058,17 @@ classdef OTFS < handle
                 syms_mapped = syms_mapped(:);
             end
         end
+    end
         
-        %% support function       
-        % sort arrays based on the 
-        % @arrs:                arrays [arr_num, arr_data_num]
-        % @first_order_arr:     the 1st array id we follow the order
-        % @second_order_arr:    the 2nd array id we follow the order
-        % @descend:             descend order
+    %% support function - Maths+
+    methods(Access=private)
+        %{
+        sort arrays based on the 
+        @arrs:                arrays [arr_num, arr_data_num]
+        @first_order_arr:     the 1st array id we follow the order
+        @second_order_arr:    the 2nd array id we follow the order
+        @descend:             descend order
+        %}
         function arrs = sortArrs(self, arrs, varargin)
             % optional inputs - register
             inPar = inputParser;
@@ -1117,6 +1138,7 @@ classdef OTFS < handle
     end
 end
 
+%% independent functions
 % select p random path indices from given paths
 % @taps_max: the maximal path number
 % @p: the path number we select

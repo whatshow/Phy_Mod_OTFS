@@ -76,7 +76,7 @@ All codes are uniform in matlab and python as a class.
         otfs.insertPilotsAndGuards(2, 2, pilots_pow=1.2, guard_delay_num_neg=1, guard_delay_num_pos=1, guard_doppler_num_neg=2, guard_doppler_num_pos=2);
         ```
     * modulate()<br>
-        `@symbols`: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]
+        `@symbols`: a vector of `n` symbols as [(batch_size), n], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum] (the pilots & guards area must be empty)
         ```c, matlab, python
         otfs.modulate(x_origin);
         ```
@@ -141,14 +141,21 @@ All codes are uniform in matlab and python as a class.
         otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_IN, No, sympool, chan_coef=chan_coef, delay_taps=delay_taps, doppler_taps=doppler_taps);
         ```
 * This section illustrate support methods to expose attributes
-    * getChannel(): return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNum*nTimeslotNum, nSubcarNum*nTimeslotNum]
-        ```python
-        H_DD = otfs.getChannel();
-        ```
     * addChannelPath(): add a path to the channel (this does not influence other existing paths)<br>
         `@hi`: the path gain (linear gain)<br>
         `@li`: the delay<br>
         `@ki`: the Doppler shift<br>
+    * getChannel(): return the Delay-Doppler domain channel matrix of [(batch_size), n, n]<br>
+        `@chan_coef`: the channel gains<br>
+        `@delay_taps`: the channel delays<br>
+        `@doppler_taps`: the channel Dopplers<br>
+        `@only_for_data`: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
+        
+        ```c, matlab, python
+        H_DD = otfs.getChannel();
+        H_DD = otfs.getChannel("chan_coef", chan_coef, "delay_taps", delay_taps, "doppler_taps", doppler_taps, "only_for_data", false); % matlab
+        H_DD = otfs.getChannel(chan_coef=chan_coef, delay_taps=delay_taps, doppler_taps=doppler_taps, only_for_data=False); # python
+        ```
     * getCSI(): get the channel state information, return [gains, delays, dopplers]<br>
         `@sort_by_gain`: sort axis<br>
         `@sort_by_delay_doppler`: sort axes<br>
