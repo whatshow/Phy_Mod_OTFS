@@ -1,4 +1,6 @@
 %% Test get CSI using sort
+clear;
+clc;
 %% settings
 SNR_p = 30; % dB
 SNR_d = 10; % dB
@@ -54,3 +56,14 @@ YDD = otfs.getYDD();
 [csi2_chan_coef, csi2_delay_taps, csi2_doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true, "descend", true);
 [csi3_chan_coef, csi3_delay_taps, csi3_doppler_taps] = otfs.getCSI("sort_by_doppler_delay", true);
 [csi4_chan_coef, csi4_delay_taps, csi4_doppler_taps] = otfs.getCSI("sort_by_doppler_delay", true, "descend", true);
+
+chan_coef_est_diff = abs(chan_coef_est - csi1_chan_coef) > eps;
+delay_taps_est_diff = abs(delay_taps_est - csi1_delay_taps) > 0;
+doppler_taps_est_diff = abs(doppler_taps_est - csi1_doppler_taps) > 0;
+
+fprintf("The channel gains difference is\n  ");
+disp(chan_coef_est_diff);
+fprintf("The channel delays difference is\n  ");
+disp(delay_taps_est_diff);
+fprintf("The channel Doppler difference is\n  ");
+disp(doppler_taps_est_diff);

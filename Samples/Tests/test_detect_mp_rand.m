@@ -58,11 +58,11 @@ parfor ifram = 1:N_fram
 end
 
 SERs_MP_Vite = mean(SERs_MP_Vite_Fram);
-fprintf("Viterbo's MP SER is %.16f\n", SERs_MP_Vite);
+fprintf("Viterbo's MP SER is %e\n", SERs_MP_Vite);
 SERs_MP_OTFS = mean(SERs_MP_OTFS_Fram);
-fprintf("Our MP SER is %.16f\n", SERs_MP_Vite);
+fprintf("Our MP SER is %e\n", SERs_MP_Vite);
 
 % difference
 SERs_diff = abs(SERs_MP_OTFS - SERs_MP_Vite);
-fprintf("The SER difference between Viterbo's base MP and ours is %.16f\n", SERs_diff);
+fprintf("The SER difference between Viterbo's base MP and ours is %e\n", SERs_diff);
 
