@@ -175,6 +175,5 @@ Before running any sample code, please make sure you are at the root path of thi
     * `test_detect_mp`: test MP detection methods
     * `test_wf` & `test_wf_*`: test waveforms
 * TestFractionalDoppler
-* TestOTFSAllFunctions: test all functions using random channels and fixed channels
-* TestWaveForms
 * `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
+* `JHYuan2021`: the folder contains serveral tests using the enviroment from [Yuan, Z., Liu, F., Yuan, W., Guo, Q., Wang, Z., & Yuan, J. (2021). Iterative detection for orthogonal time frequency space modulation with unitary approximate message passing. *IEEE transactions on wireless communications, 21(2)*, 714-725.](https://ieeexplore.ieee.org/document/9492800)
