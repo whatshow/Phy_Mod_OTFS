@@ -375,6 +375,7 @@ classdef OTFS < handle
         @guard_doppler_full:      full guard on Doppler (if set true, ignore the number setting)
         @guard_doppler_num_neg:   guard number negatively along the Doppler(time) axis
         @guard_doppler_num_pos:   guard number positively along the Doppler(time) axis
+        @force:                   whether we force to insert pilots when there is no enough space
         %}
         function insertPilotsAndGuards(self, pilots_num_delay, pilots_num_doppler, varargin)
             % optional inputs - register
@@ -441,7 +442,14 @@ classdef OTFS < handle
                     error("Guard number along the Doppler axis must be integers.");
                 end
             end
-
+            % input check - overflow (pilots + guards)
+            if pilots_num_delay + guard_delay_num_neg + guard_doppler_num_pos > self.nSubcarNum
+                error("Overflow on the delay axis (pilots + guards is over subcarrier number).");
+            end
+            if pilots_num_doppler + guard_doppler_num_neg + guard_doppler_num_pos > self.nTimeslotNum
+                error("Overflow on the Doppler axis (pilots + guards is over timeslot number).");
+            end
+                
             % initiate X_DD if empty
             if isempty(self.X_DD)
                 self.X_DD = zeros(self.nTimeslotNum, self.nSubcarNum);
