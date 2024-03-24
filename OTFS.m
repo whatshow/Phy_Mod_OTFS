@@ -722,20 +722,23 @@ classdef OTFS < handle
                 % mark redundant values - columns (X_DD invalid)
                 for doppl_id = self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end
                     for delay_id = self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end
-                        col_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
+                        col_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(:, col_id) = invalud_col;
+                        if doppl_id == 2 && delay_id == 50
+                            assert(sum(isnan(H_DD(:, col_id))) == self.nSubcarNum*self.nTimeslotNum);
+                        end
                     end
                 end
                 % mark redundant values - rows (Y_DD invalid)
                 for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
                     for delay_id = self.ce_delay_beg:self.ce_delay_end
-                        row_id = (doppl_id-1)*self.nTimeslotNum + delay_id;
+                        row_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(row_id, :) = invalud_row;
                     end
                 end
                 % remove redundant values
                 % remove redundant values - columns
-                col_idx = sum(isnan(H_DD)) == self.nSubcarNum*self.nTimeslotNum;
+                col_idx = ((sum(isnan(H_DD)) == self.nSubcarNum*self.nTimeslotNum));
                 H_DD(:, col_idx) = [];
                 % remove - rows
                 [~, H_DD_col_num] = size(H_DD);

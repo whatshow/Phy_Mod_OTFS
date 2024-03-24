@@ -173,6 +173,7 @@ Before running any sample code, please make sure you are at the root path of thi
     * `test_ce_case_10`: test illegal pilot allocation
     * `test_ce_getcsi`: test `getCSI()` using `sort`
     * `test_ce_detect_*`: test channel estimation and detection together
+    * `test_ch_*`: test the channel functions for `OTFS`
     * `test_detect_mp`: test MP detection methods
     * `test_wf` & `test_wf_*`: test waveforms
 * TestFractionalDoppler
