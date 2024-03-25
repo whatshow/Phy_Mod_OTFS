@@ -681,11 +681,14 @@ classdef OTFS < handle
             if csi_cond == 1 || csi_cond == 2
                 error("If you give CSI, you have to give channel gains, delays and Dopplers together.");
             end
+            in_taps_num = 0;
             if csi_cond == 3
-                in_chan_coef_len = length(in_chan_coef);
-                if in_chan_coef_len ~= length(in_delay_taps) && in_chan_coef_len ~= length(in_doppler_taps)
+                in_taps_num = length(in_chan_coef);
+                if in_taps_num ~= length(in_delay_taps) && in_taps_num ~= length(in_doppler_taps)
                     error("The input CSI (gains, delays and dopplers) must have the same length.");
                 end
+            else
+                in_taps_num = self.taps_num;
             end
             
             % reset the CSI if not input
@@ -700,7 +703,7 @@ classdef OTFS < handle
             idftmat = conj(dftmat); % IDFT matrix 
             piMat = eye(self.nTimeslotNum*self.nSubcarNum); % permutation matrix (from the delay) -> pi
             % accumulate all paths
-            for tap_id = 1:self.taps_num
+            for tap_id = 1:in_taps_num
                 hi = in_chan_coef(tap_id);
                 li = in_delay_taps(tap_id);
                 ki = in_doppler_taps(tap_id);
