@@ -329,12 +329,21 @@ classdef OTFS < handle
         end
         
         % pass the channel
-        % @noisePow: noise power (a scalar)
-        function r = passChannel(self, noPow)
+        % @No: noise power (a scalar) or a given noise vector
+        function r = passChannel(self, No)
             % input check
-            if ~isscalar(noPow)
-                error("The noise power must be a scalar.");
+            if isscalar(No)
+                if No < 0
+                    error("The noise power must be positive.");
+                end
+            elseif isvector(No)
+                if length(No) ~= self.nSubcarNum*self.nTimeslotNum
+                    error("The noise vector length must be %d.", self.nSubcarNum*self.nTimeslotNum);
+                end
+            else
+                error("The noise input must be a scalar for power or a vector for fixed noise.");
             end
+            
             % add CP
             cp_len = max(self.delay_taps);
             s_cp = Channel_AddCP(self.s, cp_len);
@@ -350,15 +359,18 @@ classdef OTFS < handle
                 );
                 s_chan = s_chan+s_chan_tmp;
             end
-            % add noise
-            if noPow >= 0
-                noise = sqrt(noPow/2)*(randn(size(s_chan)) + 1i*randn(size(s_chan)));
-                self.r = s_chan + noise;
-            else
-                self.r = s_chan;
-            end
+            self.r = s_chan;
             % remove CP
             self.r = self.r(cp_len+1:cp_len+(self.nTimeslotNum*self.nSubcarNum));
+            % add noise
+            if isscalar(No)
+                if No > 0
+                    noise = sqrt(No/2)*(randn(self.nSubcarNum*self.nTimeslotNum, 1) + 1i*randn(self.nSubcarNum*self.nTimeslotNum, 1));
+                    self.r = self.r + noise;
+                end
+            elseif isvector(No)
+                self.r = self.r + No;
+            end
             % return
             r = self.r;
         end

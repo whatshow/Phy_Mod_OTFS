@@ -82,7 +82,7 @@ class OTFS(object):
     @fc:              single carrier frequency (GHz), the default is 3GHz
     @pilot_loc_type:  pilot type
     '''
-    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=None, fc=None, pilot_type=None, detect_type=None, detect_csi_type=None, batch_size = BATCH_SIZE_NO):
+    def __init__(self, nSubcarNum, nTimeslotNum, *, freq_spacing=None, fc=None, pilot_loc_type=None, batch_size = BATCH_SIZE_NO):
         if not isinstance(nSubcarNum, int):
             raise Exception("The number of subcarriers must be an integer scalar.");
         else:
@@ -247,12 +247,18 @@ class OTFS(object):
     
     '''
     pass the channel
-    @noisePow: noise power (a scalar)
+    @No: noise power (a scalar) or a given noise vector
     '''
-    def passChannel(self, noPow):
-        noPow = np.asarray(noPow);
-        if noPow.ndim != 0:
-            raise Exception("The noise power must be a scalar.");
+    def passChannel(self, No):
+        No = self.squeeze(np.asarray(No));
+        if No.ndim == 0:
+            if No < 0:
+                raise Exception("The noise power must be positive.");
+        elif self.isvector(No):
+            if No.shape[-1] != self.nTimeslotNum*self.nSubcarNum:
+                raise Exception("TThe noise vector length must be %d."%(self.nSubcarNum*self.nTimeslotNum));
+        else:
+            raise Exception("The noise input must be a scalar for power or a vector for fixed noise.");
         # add CP
         cp_len = np.max(self.delay_taps);
         s_cp = Channel_AddCP(self.s, cp_len, batch_size=self.batch_size);
@@ -270,14 +276,16 @@ class OTFS(object):
                 li,
                 batch_size=self.batch_size);
             s_chan = s_chan + cur_s_tmp;
-        # add noise
-        if noPow >= 0:
-            noise = np.sqrt(noPow/2)*(self.randn(s_chan.shape[-1]) + 1j*self.randn(s_chan.shape[-1]));
-            self.r = s_chan + noise;
-        else:
-            self.r = s_chan;
+        self.r = s_chan;
         # remove CP
         self.r = self.r[cp_len:cp_len+(self.nTimeslotNum*self.nSubcarNum)] if self.batch_size == OTFS.BATCH_SIZE_NO else self.r[:, cp_len:cp_len+(self.nTimeslotNum*self.nSubcarNum)];
+        # add noise
+        if No.ndim == 0:
+            if No > 0:
+                noise = np.sqrt(No/2)*(self.randn(self.nTimeslotNum*self.nSubcarNum) + 1j*self.randn(self.nTimeslotNum*self.nSubcarNum));
+                self.r = self.r + noise;
+        elif self.isvector(No):
+            self.r = self.r + No;
         # return
         return self.r;
     
@@ -386,6 +394,32 @@ class OTFS(object):
     # Functions uniform with non-batch and batch
     ##########################################################################
     '''
+    check input is a vector like [(batch_size), n],  [(batch_size), n, 1] or [(batch_size), 1, n] 
+    '''
+    def isvector(self, mat):
+        mat = np.asarray(mat);
+        if self.batch_size is self.BATCH_SIZE_NO:
+            return mat.ndim == 1 or mat.ndim == 2 and (mat.shape[-2] == 1 or mat.shape[-1] == 1);
+        else:
+            if mat.shape[0] != self.batch_size:
+                raise Exception("The input does not has the required batch size.");
+            else:
+                return mat.ndim == 2 or mat.ndim == 3 and (mat.shape[-2] == 1 or mat.shape[-1] == 1);
+    
+    '''
+    check input is a matrix like [(batch_size), n. m]
+    '''
+    def ismatrix(self, mat):
+        mat = np.asarray(mat);
+        if self.batch_size is self.BATCH_SIZE_NO:
+            return mat.ndim == 2 and mat.shape[-2] > 1 and mat.shape[-1] > 1;
+        else:
+            if mat.shape[0] != self.batch_size:
+                raise Exception("The input does not has the required batch size.");
+            else:
+                return mat.ndim == 3 and mat.shape[-2] > 1 and mat.shape[-1] > 1;
+            
+    '''
     generate a matrix of all zeros
     @order: 'C': this function only create given dimensions; 'F': create the dimensions as matlab (2D at least)
     '''
@@ -401,6 +435,7 @@ class OTFS(object):
                 zeros_shape.insert(0, self.batch_size);
             out = np.zeros(zeros_shape);
         return out;
+    
     '''
     generate random values from [0, 1) following a uniform distribution
     @args: d0, d1, ..., dn (multiple inputs)
@@ -410,6 +445,7 @@ class OTFS(object):
             return np.random.rand(*args);
         else:
             return np.random.rand(self.batch_size, *args);
+        
     '''
     generate random values following the standard normal distribution 
     @args: d0, d1, ..., dn (multiple inputs)
@@ -419,6 +455,16 @@ class OTFS(object):
             return np.random.randn(*args);
         else:
             return np.random.randn(self.batch_size, *args);
+        
+    '''
+    squeeze redundant dimension except the batch size
+    '''
+    def squeeze(self, mat):
+        out = mat.copy();
+        out = np.squeeze(out);
+        if self.batch_size == 1 and mat.ndim > 0:
+            out = np.expand_dims(out, 0);
+        return out;
 
 ##############################################################################
 # Support Functions (only used in this model, please don't import)
