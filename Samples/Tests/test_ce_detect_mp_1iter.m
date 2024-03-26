@@ -3,18 +3,18 @@ clc;
 
 %% settings
 SNR_p = 30; % dB
-SNR_d = 10; % dB
+SNR_d = 18; % dB
 No = 1;
 pil_pow = 10^(SNR_p/10);
 pil_thr = 3*sqrt(1/pil_pow);
 sig_pow = 10^(SNR_d/10);
 % OTFS configuration
-N = 16;                          % time slot number
-M = 16;                          % subcarrier number
+N = 8;                          % time slot number
+M = 8;                          % subcarrier number
 % channel
-p = 4;
-lmax = 2;
-kmax = 2;
+p = 2;
+lmax = 1;
+kmax = 1;
 % pilot settings
 pilots_num_delay = 1;
 pilots_num_doppler = 1;
@@ -54,7 +54,7 @@ YDD = otfs.getYDD();
 [chan_coef, delay_taps, doppler_taps] = otfs.getCSI("sort_by_delay_doppler", true);
 taps = length(chan_coef_est);
 % detect
-xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_CE, No, sympool, "sym_map", true);
+% xDD_est = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_CE, No, sympool, "sym_map", true);
 xDD_est_perfect = otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool, "sym_map", true);
 
 % SER cal

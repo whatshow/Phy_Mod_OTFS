@@ -895,10 +895,13 @@ classdef OTFS < handle
             % optional inputs
             n_ite = inPar.Results.n_ite;
             delta_fra = inPar.Results.delta_fra;
-            % set initial values
+            % init
             yv = reshape(self.Y_DD, self.nTimeslotNum*self.nSubcarNum, 1);
+            % init
+            % init - observation nodes y[d]
             mean_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
             var_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
+            % init - Pc,d
             p_map = ones(self.nTimeslotNum*self.nSubcarNum,taps, self.constellation_len)*(1/self.constellation_len);
             % detect
             conv_rate_prev = -0.1;
@@ -908,7 +911,7 @@ classdef OTFS < handle
                     for ele2=1:1:self.nTimeslotNum
                         % CE - jump the area for channel estimation
                         if self.isInsertPilotsAndGuards()
-                            if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                            if ele1 >= self.ce_delay_beg && ele1 <= self.ce_delay_end && ele2 >= self.ce_doppl_beg && ele2 <= self.ce_doppl_end
                                 continue;
                             end
                         end
@@ -918,14 +921,24 @@ classdef OTFS < handle
                         for tap_no=1:taps
                             m = ele1-1-delay_taps(tap_no)+1;
                             add_term = exp(1i*2*(pi/self.nSubcarNum)*(m-1)*(Doppler_taps(tap_no)/self.nTimeslotNum));
-                            add_term1 = 1;
+                            % calculate the α_i(k,l) in the paper
+                            mp_ch_dd_alpha = 1;
                             if ele1-1<delay_taps(tap_no)
                                 n = mod(ele2-1-Doppler_taps(tap_no),self.nTimeslotNum) + 1;
-                                add_term1 = exp(-1i*2*pi*((n-1)/self.nTimeslotNum));
+                                mp_ch_dd_alpha = exp(-1i*2*pi*((n-1)/self.nTimeslotNum));
                             end
-                            new_chan = add_term * (add_term1) * chan_coef(tap_no);
-
+                            new_chan = add_term * (mp_ch_dd_alpha) * chan_coef(tap_no);
+                            % calculate the mean and variance from other taps contributing to this tap
                             for i2=1:1:self.constellation_len
+                                % jump for CE area if use CE
+                                if self.isInsertPilotsAndGuards()
+                                    % only consider the place we have values
+                                    mp_ob_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum) + 1;
+                                    mp_ob_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
+                                    if mp_ob_mean_delay_sour >= self.X_DD_invalid_delay_beg && mp_ob_mean_delay_sour <= self.X_DD_invalid_delay_end && mp_ob_mean_doppl_sour >= self.X_DD_invalid_doppl_beg && mp_ob_mean_doppl_sour <= self.X_DD_invalid_doppl_end
+                                        continue;
+                                    end
+                                end
                                 mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * self.constellation(i2);
                                 var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(self.constellation(i2))^2;
                             end
@@ -936,7 +949,7 @@ classdef OTFS < handle
 
                         mean_int_sum = sum(mean_int_hat);
                         var_int_sum = sum(var_int_hat)+(No);
-
+                        % remove the c tap from Gaussian variable estimation sum, so it remains the 
                         for tap_no=1:taps
                             mean_int(self.nTimeslotNum*(ele1-1)+ele2,tap_no) = mean_int_sum - mean_int_hat(tap_no);
                             var_int(self.nTimeslotNum*(ele1-1)+ele2,tap_no) = var_int_sum - var_int_hat(tap_no);
@@ -956,6 +969,7 @@ classdef OTFS < handle
                                 continue;
                             end
                         end
+                        
                         % original code
                         dum_sum_prob = zeros(self.constellation_len,1);
                         log_te_var = zeros(taps,self.constellation_len);
@@ -974,10 +988,17 @@ classdef OTFS < handle
                                 add_term1 = exp(-1i*2*pi*((ele2-1)/self.nTimeslotNum));
                             end
                             eff_ele2 = mod(ele2-1+Doppler_taps(tap_no),self.nTimeslotNum) + 1;
-                            new_chan = add_term * add_term1 * chan_coef(tap_no);
-
                             dum_eff_ele1(tap_no) = eff_ele1;
                             dum_eff_ele2(tap_no) = eff_ele2;
+                            new_chan = add_term * add_term1 * chan_coef(tap_no);
+                            
+                            % only consider the place we have values
+                            mp_va_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum) + 1;
+                            mp_va_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
+                            if mp_va_mean_delay_sour >= self.X_DD_invalid_delay_beg && mp_va_mean_delay_sour <= self.X_DD_invalid_delay_end && mp_va_mean_doppl_sour >= self.X_DD_invalid_doppl_beg && mp_va_mean_doppl_sour <= self.X_DD_invalid_doppl_end
+                                continue;
+                            end
+                              
                             for i2=1:1:self.constellation_len
                                 dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * self.constellation(i2))^2;
                                 dum_sum_prob(i2)= -(dum_sum_prob(i2)/var_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no));
@@ -995,6 +1016,10 @@ classdef OTFS < handle
                         for tap_no=1:1:taps
                             eff_ele1 = dum_eff_ele1(tap_no);
                             eff_ele2 = dum_eff_ele2(tap_no);
+                            
+                            if eff_ele1 >= self.X_DD_invalid_delay_beg && eff_ele1 <= self.X_DD_invalid_delay_end && eff_ele2 >= self.X_DD_invalid_doppl_beg && eff_ele2 <= self.X_DD_invalid_doppl_end
+                                continue;
+                            end
 
                             dum_sum = log_te_var(tap_no,:);
                             ln_qi_loc = ln_qi - dum_sum;
@@ -1004,6 +1029,7 @@ classdef OTFS < handle
                         end
                     end
                 end
+                % convergence indicator
                 conv_rate =  sum(max(sum_prob_comp,[],2)>0.99)/(self.nTimeslotNum*self.nSubcarNum);
                 if conv_rate==1
                     sum_prob_fin = sum_prob_comp;
