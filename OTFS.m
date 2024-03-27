@@ -901,12 +901,12 @@ classdef OTFS < handle
             % init - observation nodes y[d]
             mean_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
             var_int = zeros(self.nTimeslotNum*self.nSubcarNum,taps);
-            % init - Pc,d
+            % init - P_c,d (P_tap, d): y[d]<-x[c], aj, i.e., y[d]<-x[tap_i], aj.
             p_map = ones(self.nTimeslotNum*self.nSubcarNum,taps, self.constellation_len)*(1/self.constellation_len);
             % detect
             conv_rate_prev = -0.1;
             for ite=1:n_ite
-                % Update mean and var
+                % Update mean and var (in the view of y[d])
                 for ele1=1:1:self.nSubcarNum
                     for ele2=1:1:self.nTimeslotNum
                         % CE - jump the area for channel estimation
@@ -957,7 +957,7 @@ classdef OTFS < handle
 
                     end
                 end
-                %% Update probabilities
+                % Update probabilities (in the view of x[c])
                 sum_prob_comp = zeros(self.nTimeslotNum*self.nSubcarNum, self.constellation_len);
                 dum_eff_ele1 = zeros(taps,1);
                 dum_eff_ele2 = zeros(taps,1);
@@ -993,7 +993,7 @@ classdef OTFS < handle
                             new_chan = add_term * add_term1 * chan_coef(tap_no);
                             
                             % only consider the place we have values
-                            mp_va_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum) + 1;
+                            mp_va_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum);
                             mp_va_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
                             if mp_va_mean_delay_sour >= self.X_DD_invalid_delay_beg && mp_va_mean_delay_sour <= self.X_DD_invalid_delay_end && mp_va_mean_doppl_sour >= self.X_DD_invalid_doppl_beg && mp_va_mean_doppl_sour <= self.X_DD_invalid_doppl_end
                                 continue;
