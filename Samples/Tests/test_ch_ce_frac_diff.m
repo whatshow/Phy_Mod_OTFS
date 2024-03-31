@@ -3,6 +3,7 @@
 %
 clear;
 clc;
+fprintf("This example shows the interference from pilots when fractional Doppler happens.\n");
 
 %% general configuration
 SNR_p = 30; % dB
@@ -21,7 +22,7 @@ sympool = sqrt(sig_pow)*qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);
 
 %% test 
 nSubcarNum = 256/2;
-nTimeslotNum = 32/2;
+nTimeslotNum = 16;
 pilots_num_delay = 1;
 pilots_num_doppler = 1;
 guard_delay_num_neg = lmax;
@@ -52,3 +53,4 @@ yDD_diff = abs(yDD - H_DD*symbols);
 
 %% print
 fprintf("- the yDD calculation difference is %e\n", sum(yDD_diff)/symbols_len);
+fprintf("  - yDD is different because it is influenced by the pilot.\n");

@@ -33,6 +33,7 @@ sympool_norm = qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);
 % init otfs
 otfs = OTFS(nSubcarNum, nTimeslotNum, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
 % insert pilots
+disp("The guard allocation on the Doppler axis is going to overflow.");
 otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
 % xDD_syms
 nbits = randi([0,1],sig_len*M_bits,1);

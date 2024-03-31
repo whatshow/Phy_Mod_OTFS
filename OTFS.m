@@ -13,6 +13,10 @@ classdef OTFS < handle
         DETECT_CSI_CE = 20;                         % CSI from channel estimation (its type is based on pilot type)
         DETECT_CSI_IN = 30;                         % CSI from the input
         DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE, OTFS.DETECT_CSI_IN];
+        % CE Area Tag
+        CE_AREA_TAG_XDD = 10;
+        CE_AREA_TAG_YDD = 11;
+        CE_AREA_TAGS = [OTFS.CE_AREA_TAG_XDD, OTFS.CE_AREA_TAG_YDD];
     end
     properties
         nSubcarNum {mustBeInteger}                  % subcarrier number
@@ -39,21 +43,21 @@ classdef OTFS < handle
         pilot_loc_doppl_1st = 0;                    % 1st (lowest) pilot location in Doppler axis
         % pilot location
         pilot_loc_type = OTFS.PILOT_LOC_CENTER;
-        % invalid area in X_DD
+        % channel estimation area in X_DD
         % (these parameters will be set after `insertPilotsAndGuards`)
         % (these parameters will be used in `modulate`, `detectMPBase`)
-        X_DD_invalid_num = 0;
-        X_DD_invalid_delay_beg = NaN;
-        X_DD_invalid_delay_end = NaN;
-        X_DD_invalid_doppl_beg = NaN;
-        X_DD_invalid_doppl_end = NaN;
+        ce_xdd_num = 0;
+        ce_xdd_delay_beg = NaN;
+        ce_xdd_delay_end = NaN;
+        ce_xdd_doppl_beg = NaN;
+        ce_xdd_doppl_end = NaN;
         % channel estimation area in Y_DD
         % (these parameters will be set after `insertPilotsAndGuards`)
         % (these parameters will be used in `demodulate`, `detectMPBase`)
-        ce_delay_beg = NaN;
-        ce_delay_end = NaN;
-        ce_doppl_beg = NaN;
-        ce_doppl_end = NaN;
+        ce_ydd_delay_beg = NaN;
+        ce_ydd_delay_end = NaN;
+        ce_ydd_doppl_beg = NaN;
+        ce_ydd_doppl_end = NaN;
         % channel estimation results
         ce_delay_taps                               % estimated delay index, a row vector
         ce_doppler_taps                             % estimated doppler index (integers or fractional numbers), a row vector
@@ -109,7 +113,7 @@ classdef OTFS < handle
         %}
         function modulate(self, symbols)
             % input check
-            data_num = self.nTimeslotNum*self.nSubcarNum - self.X_DD_invalid_num;
+            data_num = self.nTimeslotNum*self.nSubcarNum - self.ce_xdd_num;
             % input check - symbols
             if ~isvector(symbols) && ~ismatrix(symbols)
                 error("The transmission symbol must be a vector or a matrix");
@@ -125,8 +129,8 @@ classdef OTFS < handle
                     error("The transmission symbol must be in the shape of (%d, %d)", self.nTimeslotNum, self.nSubcarNum);
                 end
                 if data_num ~= self.nTimeslotNum*self.nSubcarNum
-                    if sum(abs(symbols(self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end, self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end)) >= eps) ~= 0
-                        error("The transmission symbols[%d:%d, %d:%d] must be zero", self.X_DD_invalid_doppl_beg, self.X_DD_invalid_doppl_end, self.X_DD_invalid_delay_beg, self.X_DD_invalid_delay_end);
+                    if sum(abs(symbols(self.ce_xdd_doppl_beg:self.ce_xdd_doppl_end, self.ce_xdd_delay_beg:self.ce_xdd_delay_end)) >= eps) ~= 0
+                        error("The transmission symbols[%d:%d, %d:%d] must be zero", self.ce_xdd_doppl_beg, self.ce_xdd_doppl_end, self.ce_xdd_delay_beg, self.ce_xdd_delay_end);
                     end
                 end
             end
@@ -141,7 +145,7 @@ classdef OTFS < handle
                     symbols_id = 1;
                     for doppl_id = 1:self.nTimeslotNum
                         for delay_id = 1:self.nSubcarNum
-                            if doppl_id<self.X_DD_invalid_doppl_beg || doppl_id>self.X_DD_invalid_doppl_end || delay_id<self.X_DD_invalid_delay_beg || delay_id>self.X_DD_invalid_delay_end
+                            if doppl_id<self.ce_xdd_doppl_beg || doppl_id>self.ce_xdd_doppl_end || delay_id<self.ce_xdd_delay_beg || delay_id>self.ce_xdd_delay_end
                                 self.X_DD(doppl_id, delay_id) = symbols(symbols_id);
                                 symbols_id = symbols_id + 1;
                             end
@@ -155,7 +159,7 @@ classdef OTFS < handle
                 else
                     for doppl_id = 1:self.nTimeslotNum
                         for delay_id = 1:self.nSubcarNum
-                            if ~ismember(doppl_id, self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end) && ~ismember(delay_id, self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end)
+                            if ~ismember(doppl_id, self.ce_xdd_doppl_beg:self.ce_xdd_doppl_end) && ~ismember(delay_id, self.ce_xdd_delay_beg:self.ce_xdd_delay_end)
                                 self.X_DD(doppl_id, delay_id) = symbols(doppl_id, delay_id);
                             end
                         end
@@ -189,11 +193,11 @@ classdef OTFS < handle
                 yDD = yDD(:);
             else
                 % return the invalid
-                yDD = zeros(self.nTimeslotNum*self.nSubcarNum - (self.ce_doppl_end-self.ce_doppl_beg+1)*(self.ce_delay_end-self.ce_delay_beg+1), 1);
+                yDD = zeros(self.nTimeslotNum*self.nSubcarNum - (self.ce_ydd_doppl_end-self.ce_ydd_doppl_beg+1)*(self.ce_ydd_delay_end-self.ce_ydd_delay_beg+1), 1);
                 symbols_id = 1;
                 for doppl_id = 1:self.nTimeslotNum
                     for delay_id = 1:self.nSubcarNum
-                        if doppl_id<self.ce_doppl_beg || doppl_id>self.ce_doppl_end || delay_id<self.ce_delay_beg || delay_id>self.ce_delay_end
+                        if doppl_id<self.ce_ydd_doppl_beg || doppl_id>self.ce_ydd_doppl_end || delay_id<self.ce_ydd_delay_beg || delay_id>self.ce_ydd_delay_end
                             yDD(symbols_id) = self.Y_DD(doppl_id, delay_id);
                             symbols_id = symbols_id + 1;
                         end
@@ -474,7 +478,7 @@ classdef OTFS < handle
             % allocate pilots
             if pilots_len == 0
                 % no pilots no operation
-                self.X_DD_invalid_num = 0;
+                self.ce_xdd_num = 0;
             else
                 % some pilots
                 % calulate the data number for two axises
@@ -497,27 +501,27 @@ classdef OTFS < handle
                 % allocate pilots
                 self.X_DD(self.pilot_loc_doppl_1st:self.pilot_loc_doppl_1st+pilots_num_doppler-1, self.pilot_loc_delay_1st:self.pilot_loc_delay_1st+pilots_num_delay-1) = transpose(reshape(self.pilots, pilots_num_delay, pilots_num_doppler));
                 % calculate the invalid area in X_DD
-                self.X_DD_invalid_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
-                self.X_DD_invalid_delay_beg = self.pilot_loc_delay_1st - guard_delay_num_neg;
-                self.X_DD_invalid_delay_end = self.pilot_loc_delay_1st + pilots_num_delay - 1 + guard_delay_num_pos;
-                self.X_DD_invalid_doppl_beg = self.pilot_loc_doppl_1st - guard_doppler_num_neg;
-                self.X_DD_invalid_doppl_end = self.pilot_loc_doppl_1st + pilots_num_doppler - 1 + guard_doppler_num_pos;
+                self.ce_xdd_num = (pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppler_num_neg+guard_doppler_num_pos);
+                self.ce_xdd_delay_beg = self.pilot_loc_delay_1st - guard_delay_num_neg;
+                self.ce_xdd_delay_end = self.pilot_loc_delay_1st + pilots_num_delay - 1 + guard_delay_num_pos;
+                self.ce_xdd_doppl_beg = self.pilot_loc_doppl_1st - guard_doppler_num_neg;
+                self.ce_xdd_doppl_end = self.pilot_loc_doppl_1st + pilots_num_doppler - 1 + guard_doppler_num_pos;
             end
             % calulate channel estimate area
             if pilots_len > 0
                 if guard_delay_full
-                    self.ce_delay_beg = 1 + guard_doppler_num_neg;
-                    self.ce_delay_end = self.nSubcarNum;
+                    self.ce_ydd_delay_beg = 1 + guard_doppler_num_neg;
+                    self.ce_ydd_delay_end = self.nSubcarNum;
                 else
-                    self.ce_delay_beg = self.X_DD_invalid_delay_beg + guard_delay_num_neg;
-                    self.ce_delay_end = self.X_DD_invalid_delay_end;
+                    self.ce_ydd_delay_beg = self.ce_xdd_delay_beg + guard_delay_num_neg;
+                    self.ce_ydd_delay_end = self.ce_xdd_delay_end;
                 end
                 if guard_doppler_full
-                    self.ce_doppl_beg = 1 + floor(guard_doppler_num_neg/2);
-                    self.ce_doppl_end = self.nTimeslotNum - floor(guard_doppler_num_pos/2);
+                    self.ce_ydd_doppl_beg = 1 + floor(guard_doppler_num_neg/2);
+                    self.ce_ydd_doppl_end = self.nTimeslotNum - floor(guard_doppler_num_pos/2);
                 else
-                    self.ce_doppl_beg = self.X_DD_invalid_doppl_beg + floor(guard_doppler_num_neg/2);
-                    self.ce_doppl_end = self.X_DD_invalid_doppl_end - floor(guard_doppler_num_pos/2);
+                    self.ce_ydd_doppl_beg = self.ce_xdd_doppl_beg + floor(guard_doppler_num_neg/2);
+                    self.ce_ydd_doppl_end = self.ce_xdd_doppl_end - floor(guard_doppler_num_pos/2);
                 end
             end
         end
@@ -552,8 +556,8 @@ classdef OTFS < handle
             % estimate the channel
             pilot_len = length(self.pilots);
             if pilot_len == 1
-                for delay_id = self.ce_delay_beg:self.ce_delay_end
-                    for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
+                for delay_id = self.ce_ydd_delay_beg:self.ce_ydd_delay_end
+                    for doppl_id = self.ce_ydd_doppl_beg:self.ce_ydd_doppl_end
                         pss_y = self.Y_DD(doppl_id, delay_id);
                         if abs(pss_y) > threshold
                             pss_beta = exp(1j*2*pi*(self.pilot_loc_delay_1st - 1)/self.nSubcarNum*(doppl_id - self.pilot_loc_doppl_1st)/self.nTimeslotNum);
@@ -735,8 +739,8 @@ classdef OTFS < handle
                 invalud_row = NaN(1, self.nSubcarNum*self.nTimeslotNum);
                 invalud_col = NaN(self.nSubcarNum*self.nTimeslotNum, 1);
                 % mark redundant values - columns (X_DD invalid)
-                for doppl_id = self.X_DD_invalid_doppl_beg:self.X_DD_invalid_doppl_end
-                    for delay_id = self.X_DD_invalid_delay_beg:self.X_DD_invalid_delay_end
+                for doppl_id = self.ce_xdd_doppl_beg:self.ce_xdd_doppl_end
+                    for delay_id = self.ce_xdd_delay_beg:self.ce_xdd_delay_end
                         col_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(:, col_id) = invalud_col;
                         if doppl_id == 2 && delay_id == 50
@@ -745,8 +749,8 @@ classdef OTFS < handle
                     end
                 end
                 % mark redundant values - rows (Y_DD invalid)
-                for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
-                    for delay_id = self.ce_delay_beg:self.ce_delay_end
+                for doppl_id = self.ce_ydd_doppl_beg:self.ce_ydd_doppl_end
+                    for delay_id = self.ce_ydd_delay_beg:self.ce_ydd_delay_end
                         row_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(row_id, :) = invalud_row;
                     end
@@ -911,7 +915,7 @@ classdef OTFS < handle
                     for ele2=1:1:self.nTimeslotNum
                         % CE - jump the area for channel estimation
                         if self.isInsertPilotsAndGuards()
-                            if ele1 >= self.ce_delay_beg && ele1 <= self.ce_delay_end && ele2 >= self.ce_doppl_beg && ele2 <= self.ce_doppl_end
+                            if ele1 >= self.ce_ydd_delay_beg && ele1 <= self.ce_ydd_delay_end && ele2 >= self.ce_ydd_doppl_beg && ele2 <= self.ce_ydd_doppl_end
                                 continue;
                             end
                         end
@@ -935,7 +939,7 @@ classdef OTFS < handle
                                     % only consider the place we have values
                                     mp_ob_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum) + 1;
                                     mp_ob_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
-                                    if mp_ob_mean_delay_sour >= self.X_DD_invalid_delay_beg && mp_ob_mean_delay_sour <= self.X_DD_invalid_delay_end && mp_ob_mean_doppl_sour >= self.X_DD_invalid_doppl_beg && mp_ob_mean_doppl_sour <= self.X_DD_invalid_doppl_end
+                                    if mp_ob_mean_delay_sour >= self.ce_xdd_delay_beg && mp_ob_mean_delay_sour <= self.ce_xdd_delay_end && mp_ob_mean_doppl_sour >= self.ce_xdd_doppl_beg && mp_ob_mean_doppl_sour <= self.ce_xdd_doppl_end
                                         continue;
                                     end
                                 end
@@ -965,7 +969,7 @@ classdef OTFS < handle
                     for ele2=1:1:self.nTimeslotNum
                         % CE - jump the area for channel estimation
                         if self.isInsertPilotsAndGuards()
-                            if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                            if ele1 >= self.ce_xdd_delay_beg && ele1 <= self.ce_xdd_delay_end && ele2 >= self.ce_xdd_doppl_beg && ele2 <= self.ce_xdd_doppl_end
                                 continue;
                             end
                         end
@@ -995,7 +999,7 @@ classdef OTFS < handle
                             % only consider the place we have values
                             mp_va_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum);
                             mp_va_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
-                            if mp_va_mean_delay_sour >= self.X_DD_invalid_delay_beg && mp_va_mean_delay_sour <= self.X_DD_invalid_delay_end && mp_va_mean_doppl_sour >= self.X_DD_invalid_doppl_beg && mp_va_mean_doppl_sour <= self.X_DD_invalid_doppl_end
+                            if mp_va_mean_delay_sour >= self.ce_xdd_delay_beg && mp_va_mean_delay_sour <= self.ce_xdd_delay_end && mp_va_mean_doppl_sour >= self.ce_xdd_doppl_beg && mp_va_mean_doppl_sour <= self.ce_xdd_doppl_end
                                 continue;
                             end
                               
@@ -1017,7 +1021,7 @@ classdef OTFS < handle
                             eff_ele1 = dum_eff_ele1(tap_no);
                             eff_ele2 = dum_eff_ele2(tap_no);
                             
-                            if eff_ele1 >= self.X_DD_invalid_delay_beg && eff_ele1 <= self.X_DD_invalid_delay_end && eff_ele2 >= self.X_DD_invalid_doppl_beg && eff_ele2 <= self.X_DD_invalid_doppl_end
+                            if eff_ele1 >= self.ce_xdd_delay_beg && eff_ele1 <= self.ce_xdd_delay_end && eff_ele2 >= self.ce_xdd_doppl_beg && eff_ele2 <= self.ce_xdd_doppl_end
                                 continue;
                             end
 
@@ -1047,7 +1051,7 @@ classdef OTFS < handle
                 for ele2=1:1:self.nTimeslotNum
                     % CE - jump the area for channel estimation
                     if self.isInsertPilotsAndGuards()
-                        if ele1 >= self.X_DD_invalid_delay_beg && ele1 <= self.X_DD_invalid_delay_end && ele2 >= self.X_DD_invalid_doppl_beg && ele2 <= self.X_DD_invalid_doppl_end
+                        if ele1 >= self.ce_xdd_delay_beg && ele1 <= self.ce_xdd_delay_end && ele2 >= self.ce_xdd_doppl_beg && ele2 <= self.ce_xdd_doppl_end
                             continue;
                         end
                     end
@@ -1056,7 +1060,7 @@ classdef OTFS < handle
                 end
             end
             % extract symbols
-            symbols = zeros(self.nTimeslotNum*self.nSubcarNum - self.X_DD_invalid_num, 1);
+            symbols = zeros(self.nTimeslotNum*self.nSubcarNum - self.ce_xdd_num, 1);
             % return
             if ~self.isInsertPilotsAndGuards()
                 % no CE
@@ -1067,7 +1071,7 @@ classdef OTFS < handle
                 symbols_id = 1;
                 for doppl_id = 1:self.nTimeslotNum
                     for delay_id = 1:self.nSubcarNum
-                        if doppl_id<self.X_DD_invalid_doppl_beg || doppl_id>self.X_DD_invalid_doppl_end || delay_id<self.X_DD_invalid_delay_beg || delay_id>self.X_DD_invalid_delay_end
+                        if doppl_id<self.ce_xdd_doppl_beg || doppl_id>self.ce_xdd_doppl_end || delay_id<self.ce_xdd_delay_beg || delay_id>self.ce_xdd_delay_end
                             symbols(symbols_id) = X_DD_est(doppl_id, delay_id);
                             symbols_id = symbols_id + 1;
                         end
@@ -1086,11 +1090,63 @@ classdef OTFS < handle
             % check whether pilots is assigned or not
             is_done = ~isempty(self.pilots);
             % check whether X_DD_invalid area is calculated
-            is_done = is_done && ~isnan(self.X_DD_invalid_delay_beg) && ~isnan(self.X_DD_invalid_delay_end) && ~isnan(self.X_DD_invalid_doppl_beg) && ~isnan(self.X_DD_invalid_doppl_end);
+            is_done = is_done && ~isnan(self.ce_xdd_delay_beg) && ~isnan(self.ce_xdd_delay_end) && ~isnan(self.ce_xdd_doppl_beg) && ~isnan(self.ce_xdd_doppl_end);
             % check whether CE area is calulated
-            is_done = is_done && ~isnan(self.ce_delay_beg) && ~isnan(self.ce_delay_end) && ~isnan(self.ce_doppl_beg) && ~isnan(self.ce_doppl_end);
+            is_done = is_done && ~isnan(self.ce_ydd_delay_beg) && ~isnan(self.ce_ydd_delay_end) && ~isnan(self.ce_ydd_doppl_beg) && ~isnan(self.ce_ydd_doppl_end);
         end
-           
+
+        %{
+        check whether the current position is in channel estimation area
+        @ce_area_tag:   notify whether CE area to check
+        @pos_delay:     the position on the delay axis for matrix or th position on the Doppler-delay axis for the vector
+        @pos_doppl:     the position on the Doppler axis. Not given means the position is for a Doppler-delay vector
+        %}
+        function is_in = isCurPosInCEXDDArea(delay_pos, varargin)
+            is_in = self.isCurPosInCEArea(self.CE_AREA_TAG_XDD, delay_pos, varargin);
+        end
+        function is_in = isCurPosInCEYDDArea(delay_pos, varargin)
+            is_in = self.isCurPosInCEArea(self.CE_AREA_TAG_YDD, delay_pos, varargin);
+        end
+        function is_in = isCurPosInCEArea(self, ce_area_tag, delay_pos, varargin)
+            % input check
+            if ismember(ce_area_tag, self.CE_AREA_TAGS)
+                error("The CE area tag is illegal.");
+            end
+            if isempty(varargin)
+                if delay_pos <= 0 || delay_pos > self.nSubcarNum*self.nTimeslotNum
+                    error("The vector position is out of the OTFS size.");
+                end
+            else
+                if delay_pos <= 0 || delay_pos > self.nSubcarNum
+                    error("The delay position is out of the subcarrier number.");
+                end
+                if varargin{1} <= 0 || varargin{1} > self.nTimeslotNum
+                    error("The Doppler position is out of the timeslot number.");
+                end
+            end
+            
+            % recalculate the position
+            pos_doppl = 0;
+            if isempty(varargin)
+                pos_doppl = delay_pos/self.nSubcarNum;
+                if pos_doppl == floor(pos_doppl)
+                    pos_doppl = floor(pos_doppl);
+                else
+                    pos_doppl = floor(pos_doppl) + 1;
+                end
+                delay_pos = delay_pos - (pos_doppl-1)*self.nSubcarNum;
+            else
+                pos_doppl = varargin{1};
+            end
+            % decide
+            if ce_area_tag == self.CE_AREA_TAG_XDD
+                is_in = delay_pos >= self.ce_xdd_delay_beg && delay_pos <= self.ce_xdd_delay_end && pos_doppl >= self.ce_xdd_doppl_beg && pos_doppl <= self.ce_xdd_doppl_end;
+            end
+            if ce_area_tag == self.CE_AREA_TAG_YDD
+                is_in = delay_pos >= self.ce_ydd_delay_beg && delay_pos <= self.ce_ydd_delay_end && pos_doppl >= self.ce_ydd_doppl_beg && pos_doppl <= self.ce_ydd_doppl_end;
+            end
+        end
+
         %{
         symbol mapping (hard)
         @syms: a vector of symbols
