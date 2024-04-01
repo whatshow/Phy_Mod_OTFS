@@ -178,3 +178,4 @@ Before running any sample code, please make sure you are at the root path of thi
     * `test_wf` & `test_wf_*`: test waveforms
 * TestFractionalDoppler
 * `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
+* `WaveForm`: this is to observe the waveform of OTFS.
