@@ -14,7 +14,15 @@
 % OUTPUT
 % @H:           the time-frequency channel
 % @Heff_rect:   the delay-doppler channel for rectangular pulses
-function [H, Heff_rect] = OTFS_ddchannel_gen(M, N, taps,delay_taps,doppler_taps,chan_coef)
+function [H, Heff_rect] = OTFS_ddchannel_gen(M, N, taps,delay_taps,doppler_taps,chan_coef, varargin)
+    % Inputs Name-Value Pair 
+    inPar = inputParser;
+    addParameter(inPar, 'real_channel', false, @islogical);
+    inPar.KeepUnmatched = true;         % Allow unmatched cases
+    inPar.CaseSensitive = false;        % Allow capital or small characters
+    parse(inPar, varargin{:});
+    real_channel = inPar.Results.real_channel;
+
     % Output
     H = zeros(M*N, M*N);
     Heff_rect = zeros(M*N, M*N);
@@ -23,9 +31,7 @@ function [H, Heff_rect] = OTFS_ddchannel_gen(M, N, taps,delay_taps,doppler_taps,
     
     dftmat = dftmtx(N)/sqrt(N);
     idftmat = conj(dftmat);
-    
-    lmax = max(delay_taps);
-    
+       
     % Permutation Matrix
     piMat = eye(M*N);
     for itap = 1:taps
