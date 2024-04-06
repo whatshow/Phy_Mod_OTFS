@@ -1,6 +1,16 @@
 classdef OTFS < handle
     % constants
     properties(Constant)
+        % Pulse Types
+        PULSE_IDEAL = 10;   % ideal pulses
+        PULSE_RECTA = 20;   % rectangular pulses
+        PULSE_TYPES = [OTFS.PULSE_IDEAL, OTFS.PULSE_RECTA];
+        % isi cancel methods
+        ISI_CANCEL_NO = 0;              % no isi cancel
+        ISI_CANCEL_CP = 10;             % one cp for entire OTFS frame
+        ISI_CANCEL_CP_MULTI = 11;       % one cp for each OTFS subframe
+        ISI_CANCEL_ZP = 20;             % zero padding
+        ISI_CANCEL_TYPES = [OTFS.ISI_CANCEL_NO, OTFS.ISI_CANCEL_CP, OTFS.ISI_CANCEL_CP_MULTI, OTFS.ISI_CANCEL_ZP];
         % Pilot locations
         PILOT_LOC_CENTER = 10;                      % the pilot is put at the center of frame
         PILOT_LOC_DELAY_MOST_CENTER = 20;           % the pilot is put at the most delay area center
