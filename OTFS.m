@@ -807,20 +807,23 @@ classdef OTFS < handle
             gains = self.chan_coef(:).';
             delays = self.delay_taps(:).';
             dopplers = self.doppler_taps(:).';
-            if sort_by_gain
-                [gains, sort_idx] = sort(gains, sort_direction);
-                delays = delays(sort_idx);
-                dopplers = dopplers(sort_idx);
-            elseif sort_by_delay_doppler
-                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 2, "second_order_arr", 3, "descend", descend);
-                gains = arrs_sorted(1, :);
-                delays = arrs_sorted(2, :);
-                dopplers = arrs_sorted(3, :);
-            elseif sort_by_doppler_delay
-                arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 3, "second_order_arr", 2, "descend", descend);
-                gains = arrs_sorted(1, :);
-                delays = arrs_sorted(2, :);
-                dopplers = arrs_sorted(3, :);
+            % only sort when there are multiple taps
+            if self.taps_num > 1
+                if sort_by_gain
+                    [gains, sort_idx] = sort(gains, sort_direction);
+                    delays = delays(sort_idx);
+                    dopplers = dopplers(sort_idx);
+                elseif sort_by_delay_doppler
+                    arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 2, "second_order_arr", 3, "descend", descend);
+                    gains = arrs_sorted(1, :);
+                    delays = arrs_sorted(2, :);
+                    dopplers = arrs_sorted(3, :);
+                elseif sort_by_doppler_delay
+                    arrs_sorted = self.sortArrs([gains;delays;dopplers], "first_order_arr", 3, "second_order_arr", 2, "descend", descend);
+                    gains = arrs_sorted(1, :);
+                    delays = arrs_sorted(2, :);
+                    dopplers = arrs_sorted(3, :);
+                end
             end
         end
         
