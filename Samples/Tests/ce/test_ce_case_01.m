@@ -1,5 +1,5 @@
 % 
-% test all pilots allocation for **center pilots and reduced guard** (no noise)
+% test all pilots allocation for **center pilots and reduced guard** (integer Doppler & no noise)
 %
 clear;
 clc;
@@ -36,11 +36,12 @@ guard_delay_num_pos = lmax;
 guard_doppl_num_neg = kmax*2;
 guard_doppl_num_pos = kmax*2;
 symbols_len = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppl_num_neg+guard_doppl_num_pos);
+nbits = randi([0 1], symbols_len*M_bits, 1);
+symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs = OTFS(M, N, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
 otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
 X_DD_PG1 = otfs.X_DD;
-nbits = randi([0 1], symbols_len*M_bits, 1);
-symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
+
 otfs.modulate(symbols);
 X_DD1 = otfs.X_DD;
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
@@ -62,11 +63,11 @@ guard_delay_num_pos = lmax;
 guard_doppl_num_neg = kmax*2;
 guard_doppl_num_pos = kmax*2;
 symbols_len = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppl_num_neg+guard_doppl_num_pos);
+nbits = randi([0 1], symbols_len*M_bits, 1);
+symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs = OTFS(M, N, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
 otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
 X_DD_PG2 = otfs.X_DD;
-nbits = randi([0 1], symbols_len*M_bits, 1);
-symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs.modulate(symbols);
 X_DD2 = otfs.X_DD;
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
@@ -91,11 +92,11 @@ guard_delay_num_pos = lmax;
 guard_doppl_num_neg = kmax*2;
 guard_doppl_num_pos = kmax*2;
 symbols_len = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppl_num_neg+guard_doppl_num_pos);
+nbits = randi([0 1], symbols_len*M_bits, 1);
+symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs = OTFS(M, N, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
 otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
 X_DD_PG3 = otfs.X_DD;
-nbits = randi([0 1], symbols_len*M_bits, 1);
-symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs.modulate(symbols);
 X_DD3 = otfs.X_DD;
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
@@ -117,11 +118,11 @@ guard_delay_num_pos = lmax;
 guard_doppl_num_neg = kmax*2;
 guard_doppl_num_pos = kmax*2;
 symbols_len = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppler+guard_doppl_num_neg+guard_doppl_num_pos);
+nbits = randi([0 1], symbols_len*M_bits, 1);
+symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs = OTFS(M, N, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
 otfs.insertPilotsAndGuards(pilots_num_delay, pilots_num_doppler, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppler_num_neg", guard_doppl_num_neg, "guard_doppler_num_pos", guard_doppl_num_pos);
 X_DD_PG4 = otfs.X_DD;
-nbits = randi([0 1], symbols_len*M_bits, 1);
-symbols = sqrt(sig_pow)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
 otfs.modulate(symbols);
 X_DD4 = otfs.X_DD;
 otfs.setChannel("p", p, "lmax", lmax, "kmax", kmax);
