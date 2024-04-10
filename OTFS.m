@@ -4,13 +4,11 @@ classdef OTFS < handle
         % Pulse Types
         PULSE_IDEAL = 10;   % ideal pulses (if we use ideal pulses, `ISI_CANCEL_CP` is forced to chosen)
         PULSE_RECTA = 20;   % rectangular pulses
-        PULSE_TYPES = [OTFS.PULSE_IDEAL, OTFS.PULSE_RECTA];
-        % isi cancel methods
-        ISI_CANCEL_GUARD = 0;                       % use zero guards to avoid ISI
-        ISI_CANCEL_CP = 10;                         % one cp for entire OTFS frame
-        ISI_CANCEL_CP_MULTI = 11;                   % one cp for each OTFS subframe
-        ISI_CANCEL_ZP = 20;                         % zero padding
-        ISI_CANCEL_TYPES = [OTFS.ISI_CANCEL_GUARD, OTFS.ISI_CANCEL_CP, OTFS.ISI_CANCEL_CP_MULTI, OTFS.ISI_CANCEL_ZP];
+        % cyclic prefix
+        CP_NONE = 0;                                 % no cyclic prefix
+        CP_ZERO = 10;                                % use zero guards to avoid ISI
+        CP_ONE_FRAM = 20;                            % one cp for entire OTFS frame
+        CP_ONE_FRAM_SUB = 21;                        % one cp for each OTFS subframe
         % Detect
         DETECT_MP_BASE = 10;                        % base OTFS MP detector proposed by P. Raviteja in 2018
         DETECT_TYPES = [OTFS.DETECT_MP_BASE];
@@ -19,206 +17,126 @@ classdef OTFS < handle
         DETECT_CSI_CE = 20;                         % CSI from channel estimation (its type is based on pilot type)
         DETECT_CSI_IN = 30;                         % CSI from the input
         DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE, OTFS.DETECT_CSI_IN];
-        % CE Area Tag
-        CE_AREA_TAG_XDD = 10;
-        CE_AREA_TAG_YDD = 11;
-        CE_AREA_TAGS = [OTFS.CE_AREA_TAG_XDD, OTFS.CE_AREA_TAG_YDD];
     end
     properties
         nSubcarNum {mustBeInteger}                  % subcarrier number
         nTimeslotNum {mustBeInteger}                % timeslot number
-        X_DD                                        % Tx value in the delay Doppler(DD) domain
         X_TF                                        % Tx value in the time-frequency(TF) domain
         s                                           % Tx value in the time domain (array)
         H                                           % channel in the time domain
         r                                           % Rx value in the time domain (array)
         Y_TF                                        % Rx value in the TF domain
-        Y_DD                                        % Rx value in the DD domain
-        y_DD                                        % Rx value in the DD domain (vectorized)
-        taps_num = 0                                % paths number              
+        % channel
+        taps_num = 0                                % paths number           
+        chan_coef                                   % path gain, a row vector
         delay_taps                                  % delay index, a row vector
         doppler_taps                                % doppler index (integers or fractional numbers), a row vector
-        chan_coef                                   % path gain, a row vector
-        % pulse & ISI
+        % pulse
         pulse_type = OTFS.PULSE_RECTA;
-        isi_cancel_type = OTFS.ISI_CANCEL_CP;
+        % cp
+        cp_type = OTFS.CP_ONE_FRAM;
         % detection
         constellation                               % constellation
         constellation_len = 0;
     end
     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % General OTFS Methods
-    methods   
-        %{
-        constructor
-        @nSubcarNum:                subcarrier number
-        @nTimeslotNum:              timeslot number
-        @pulse_type:                pulse shaping
-        @isi_cancel_type:
-        %}
-        function self = OTFS(nSubcarNum, nTimeslotNum, varargin)
-            % Inputs Name-Value Pair 
-            inPar = inputParser;
-            addParameter(inPar, "pulse_type", self.pulse_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.PULSE_TYPES));
-            addParameter(inPar, "isi_cancel_type", self.isi_cancel_type, @(x) isscalar(x)&&isnumeric(x)&&ismember(x, self.ISI_CANCEL_TYPES));
-            inPar.KeepUnmatched = true;                                             % Allow unmatched cases
-            inPar.CaseSensitive = false;                                            % Allow capital or small characters
-            parse(inPar, varargin{:});
-
-            % take inputs
-            % nSubcarNum  
-            if ~isscalar(nSubcarNum) || nSubcarNum ~= floor(nSubcarNum)
-                error("The number of subcarriers must be an integer scalar.");
-            else
-                self.nSubcarNum = nSubcarNum;
-            end
-            % nSubcarNum
-            if ~isscalar(nTimeslotNum) || nTimeslotNum ~= floor(nTimeslotNum)
-                error("The number of timeslots must be an integer scalar.");
-            else
-                self.nTimeslotNum = nTimeslotNum;
-            end
-            % pulse shaping
-            self.pulse_type = inPar.Results.pulse_type;
-            % isi cancel type
-            self.isi_cancel_type = inPar.Results.isi_cancel_type;
-            if self.pulse_type == self.PULSE_IDEAL
-                self.isi_cancel_type = self.ISI_CANCEL_CP;
-            end
-        end
-        
+    methods
         %{
         modulate
         @rg: an OTFS resource grid
         %}
         function modulate(self, rg)
-            % ISFFT 
-            X_FT = fft(ifft(rg.getXDD()).').'/sqrt(self.nSubcarNum/self.nTimeslotNum);
-            % X_TF is [nSubcarNum, nTimeslotNum]
-            self.X_TF = X_FT.'; 
-            % Heisenberg transform
-            s_mat = ifft(self.X_TF)*sqrt(self.nSubcarNum);
-            % vectorize
-            self.s = s_mat(:);
+            if ~isa(rg, 'OTFSResGrid')
+                error("The input must be an OTFS resource grid.");
+            end
+            % load RG settings
+            [self.nSubcarNum, self.nTimeslotNum] = rg.getContentSize();
+            if rg.isPulseIdeal()
+                self.pulse_type = self.PULSE_IDEAL;
+            elseif rg.isPulseRecta()
+                self.pulse_type = self.PULSE_RECTA;
+            else
+                error("Pulse shaping is not given in the resource grid.");
+            end
+            % load RG data
+            X_DD = rg.getContent();
+            % modulate
+            X_FT = fft(ifft(X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum); % ISFFT 
+            self.X_TF = X_FT.'; % X_TF is [nSubcarNum, nTimeslotNum]
+            s_mat = ifft(self.X_TF)*sqrt(self.nSubcarNum); % Heisenberg transform
+            self.s = s_mat(:); % vectorize
         end
 
-        %{
-        demodulate
-        %}
-        function yDD = demodulate(self)
-            r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
-            % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
-            self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum); 
-            Y_FT = self.Y_TF.';
-            % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
-            self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); 
-            % vectorize
-            if ~self.isInsertPilotsAndGuards()
-                % no invalid area
-                yDD = self.Y_DD.';
-                yDD = yDD(:);
-            else
-                % return the invalid
-                yDD = zeros(self.nTimeslotNum*self.nSubcarNum - (self.ce_ydd_doppl_end-self.ce_ydd_doppl_beg+1)*(self.ce_ydd_delay_end-self.ce_ydd_delay_beg+1), 1);
-                symbols_id = 1;
-                for doppl_id = 1:self.nTimeslotNum
-                    for delay_id = 1:self.nSubcarNum
-                        if doppl_id<self.ce_ydd_doppl_beg || doppl_id>self.ce_ydd_doppl_end || delay_id<self.ce_ydd_delay_beg || delay_id>self.ce_ydd_delay_end
-                            yDD(symbols_id) = self.Y_DD(doppl_id, delay_id);
-                            symbols_id = symbols_id + 1;
-                        end
+        % set channel (in1, in2, in3)
+        % set a fixed chanel (at least two paths, if you want to add one fixed path, call `setChannelExtra`)
+        % @in1->his:        the path gains
+        % @in2->lis:        the delays
+        % @in3->kis:        the doppler shifts
+        % set a random channel (overwritten the channel setting)
+        % @in1->p:          the path number
+        % @in2->lmax:       the maxmimal delay index
+        % @in3->kmax:       the maximal Doppler index (can be fractional)
+        % @force_frac:      use fractional Doppler (force)
+        % @isAWGN:          use awgn
+        % @isRician:        use Rician fading
+        function setChannel(self, in1, in2, in3, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"force_frac", false, @(x) isscalar(x)&islogical(x)); 
+            addParameter(inPar,"isAWGN", false, @(x) isscalar(x)&islogical(x)); 
+            addParameter(inPar,"isRician", true, @(x) isscalar(x)&islogical(x)); 
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            force_frac = inPar.Results.force_frac;
+            isAWGN = inPar.Results.isAWGN;
+            isRician = inPar.Results.isRician;
+            % set the channel
+            if ~isscalar(in1) && ~isscalar(in2) && ~isscalar(in3)
+                % no scalar, giving fixed path
+                in1_len = length(in1);
+                in2_len = length(in2);
+                in3_len = length(in3);
+                if ~isvector(in1) || ~isvector(in2) || ~isvector(in3)
+                    error("The path gains, delays and dopplers must be 1D vectors.");
+                elseif in1_len ~= in2_len || in1_len ~= in3_len
+                    error("The path gains, delays and dopplers do not have the same length.");
+                else
+                    self.taps_num = in1_len;
+                    self.chan_coef = in1;
+                    self.delay_taps = in2;
+                    self.doppler_taps = in3;
+                end
+            elseif isscalar(in1) && isscalar(in2) && isscalar(in3)
+                % scalar, random paths
+                p = in1;
+                lmax = in2;
+                kmax = in3;
+                if kmax ~= floor(kmax)
+                    force_frac = true;
+                else
+                    if ~isempty(varargin)
+                        force_frac = varargin{1};
                     end
                 end
-            end
-            % store
-            self.y_DD = yDD;
-        end
-
-        % set channel
-        % <set random paths>
-        % @p: the path number
-        % @lmax: the maxmimal delay index
-        % @kmax: the maximal Doppler index (can be fractional)
-        % <set known paths>
-        % @delays:      the delays
-        % @dopplers:    the doppler shifts
-        % @gains:       the path gains
-        function setChannel(self, varargin)
-            % Inputs Name-Value Pair 
-            inPar = inputParser;
-            addParameter(inPar,'p', 0, @(x) isscalar(x)&&round(x)==x);
-            addParameter(inPar,'lmax', 0, @(x) isscalar(x)&&round(x)==x);
-            addParameter(inPar,'kmax', 0, @isscalar);
-            addParameter(inPar,'delays', [], @isnumeric);
-            addParameter(inPar,'dopplers', [], @isnumeric);
-            addParameter(inPar,'gains', [], @isnumeric);
-            inPar.KeepUnmatched = true;                                          % Allow unmatched cases
-            inPar.CaseSensitive = false;                                         % Allow capital or small characters
-            % load inputs
-            parse(inPar, varargin{:});
-            p = inPar.Results.p;
-            lmax = inPar.Results.lmax;
-            kmax = inPar.Results.kmax;
-            kmax_frac = 0;
-            is_fractional_doppler = false;
-            if kmax ~= floor(kmax)
-                is_fractional_doppler = true;
-                kmax_frac = kmax;
-                kmax = floor(kmax);
-            end
-            delays = inPar.Results.delays;
-            dopplers = inPar.Results.dopplers;
-            gains = inPar.Results.gains;
-            
-            % check which input we should use
-            if ~isempty(delays) && ~isempty(dopplers) && ~isempty(gains)
-                % take the assigned channels
-                delays_len = length(delays);
-                dopplers_len = length(dopplers);
-                gains_len = length(gains);
-                if ~isvector(delays) && ~isvector(dopplers) && ~isvector(gains) && (delays_len ~= dopplers_len || delays_len ~= gains_len)
-                    error("The delays, dopplers and gains do not have the same length.");
-                else
-                    self.delay_taps = delays;
-                    self.doppler_taps = dopplers;
-                    self.chan_coef = gains;
-                    self.taps_num = delays_len;
-                end
-            elseif p > 0 && lmax >= 1 && (kmax > 0 || kmax_frac > 0)
-                % generate random channels
                 % input check
                 if p > (lmax + 1)*(2*kmax+1)
                     error("The path number must be less than lmax*(2*kmax+1) = %d", (lmax + 1)*(2*kmax+1));
                 end
-                if lmax >= self.nSubcarNum
-                    error("The maximal delay index must be less than the subcarrier number.");
-                end
-                % input check - update kmax if using fractional Doppler
-                if ~is_fractional_doppler
-                    if kmax > floor(self.nTimeslotNum/2)
-                        error("The maximal Doppler index must be less than the half of the timeslot number");
-                    end
-                else
-                    if kmax_frac > floor(self.nTimeslotNum/2)
-                        error("The maximal fractional Doppler index must be less than the half of the timeslot number");
-                    end
-                end
                 lmin= 1;
                 kmin = -kmax;
                 taps_max = (kmax - kmin + 1)*(lmax - lmin + 1);
-                % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
-                delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); 
-                % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
-                Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1);
-                % We select P paths from all possible paths; that is, we do the randperm(taps_max) and we choose the first P items
-                taps_selected_idx = Channl_SelectRandomPathIdx(taps_max, p);
-                % set channel info
+                delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
+                Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1); % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
+                taps_selected_idx = self.shufSelectTopNIdx(taps_max, p); % select P paths from all possible paths
+                % CSI - delay
                 self.delay_taps = delay_taps_all(taps_selected_idx);
-                % the 1st minimal delay is 0
                 self.delay_taps(find(self.delay_taps == min(self.delay_taps), 1)) = 0;
+                % CSI - doppler
                 self.doppler_taps = Doppler_taps_all(taps_selected_idx);
-                % add fractional Doppler
-                if is_fractional_doppler
+                if force_frac % add fractional Doppler
                     doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
                     doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                     doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
@@ -228,18 +146,27 @@ classdef OTFS < handle
                     frac_range_all = frac_range_max_pos.*doppler_taps_k_max_pos_idx + frac_range_max_neg.*doppler_taps_k_max_neg_idx + frac_range_others.*doppler_taps_k_other_idx;
                     self.doppler_taps = self.doppler_taps + frac_range_all;
                 end
-                self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
+                % CSI - others
                 self.taps_num = p;
+                if isAWGN
+                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (ones(1, p)+1i*ones(1, p)));
+                elseif isRician
+                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (ones(1, p)+1i*ones(1, p))) + sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
+                else
+                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p))); % use Rayleigh fading by default
+                end                
             else
-                error("Channel Infomation is not recognised.");
+                error("The given CSI is not recognised.");
             end
         end
         
-        % add a path to the channel (this does not influence other existing paths)
-        % @hi:      the path gain (linear gain)
-        % @li:      the delay
-        % @ki:      the Doppler shift
-        function addChannelPath(self, hi, li, ki)
+        %{
+        add a path to the channel (this does not influence other existing paths)
+        @hi:      the path gain (linear gain)
+        @li:      the delay
+        @ki:      the Doppler shift
+        %}
+        function setChannelExtra(self, hi, li, ki)
             if isempty(self.chan_coef)
                 self.chan_coef = hi;
             else
@@ -258,8 +185,10 @@ classdef OTFS < handle
             self.taps_num = self.taps_num + 1;
         end
         
-        % pass the channel
-        % @No: noise power (a scalar) or a given noise vector
+        %{
+        pass the channel
+        @No: noise power (a scalar) or a given noise vector
+        %}
         function r = passChannel(self, No)
             % input check
             if isscalar(No)
@@ -304,56 +233,21 @@ classdef OTFS < handle
             % return
             r = self.r;
         end
-        
+
         %{
-        % estimated the channel
-        % @threshold: the threshold to detect a path
+        demodulate
         %}
-        function [gains, delays, dopplers] = estimateChannel(self, varargin)
-            % optional inputs - register
-            inPar = inputParser;
-            addParameter(inPar, 'threshold', [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
-            inPar.KeepUnmatched = true;     % Allow unmatched cases
-            inPar.CaseSensitive = false;    % Allow capital or small characters
-            parse(inPar, varargin{:});
-            % optional inputs - assign
-            threshold = inPar.Results.threshold;
-            % input check
-            % input check - insert pilots & guards
-            if ~self.isInsertPilotsAndGuards()
-                error("The pilot & guard allocation has to be done before channel estimation.");
-            end
-            % input check - demodulation
-            if isempty(self.Y_DD) || isempty(self.y_DD)
-                error("Demodulation has to be done before symbol detection.");
-            end
-            % input check - threshold
-            if ~isempty(threshold) && threshold < 0
-                error("The threshould must be non-negative.");
-            end
-            
-            % estimate the channel
-            pilot_len = length(self.pilots);
-            if pilot_len == 1
-                for delay_id = self.ce_ydd_delay_beg:self.ce_ydd_delay_end
-                    for doppl_id = self.ce_ydd_doppl_beg:self.ce_ydd_doppl_end
-                        pss_y = self.Y_DD(doppl_id, delay_id);
-                        if abs(pss_y) > threshold
-                            pss_beta = exp(1j*2*pi*(self.pilot_loc_delay_1st - 1)/self.nSubcarNum*(doppl_id - self.pilot_loc_doppl_1st)/self.nTimeslotNum);
-                            self.ce_chan_coef(end+1) = pss_y/self.pilots/pss_beta;
-                            self.ce_delay_taps(end+1) = delay_id - self.pilot_loc_delay_1st;
-                            self.ce_doppler_taps(end+1) = doppl_id - self.pilot_loc_doppl_1st;
-                        end
-                    end
-                end
-            else
-                warning("Multiple pilots CE is not supported.");
-            end
+        function rg = demodulate(self)
+            r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
+            % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
+            self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum); 
+            Y_FT = self.Y_TF.';
+            % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
+            Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum);
             % return
-            gains = self.ce_chan_coef;
-            delays = self.ce_delay_taps;
-            dopplers = self.ce_doppler_taps;
+            rg = OTFSResGrid(Y_DD);
         end
+        
         
         %{
         detect
@@ -395,9 +289,7 @@ classdef OTFS < handle
                 error("The channel state information source is illegal.");
             end
             if csi_type == self.DETECT_CSI_CE
-                if ~self.isInsertPilotsAndGuards()
-                    error("The pilot & guard allocation has to be done before channel estimation.");
-                elseif isempty(self.ce_delay_taps) || isempty(self.ce_doppler_taps) || isempty(self.ce_chan_coef)
+                if ~isempty(self.ce_delay_taps) || isempty(self.ce_doppler_taps) || isempty(self.ce_chan_coef)
                     error("Channel estimation has to be done before symbol detection.");
                 end
             elseif csi_type == self.DETECT_CSI_IN
@@ -446,7 +338,8 @@ classdef OTFS < handle
         end
     end
     
-    %% Getters & Setters
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Getters & Setters
     methods
         %{
         Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
@@ -476,7 +369,6 @@ classdef OTFS < handle
             if csi_cond == 1 || csi_cond == 2
                 error("If you give CSI, you have to give channel gains, delays and Dopplers together.");
             end
-            in_taps_num = 0;
             if csi_cond == 3
                 in_taps_num = length(in_chan_coef);
                 if in_taps_num ~= length(in_delay_taps) && in_taps_num ~= length(in_doppler_taps)
@@ -514,7 +406,7 @@ classdef OTFS < handle
                 H_DD = H_DD + hi*Ti;
             end
             % remove redundant values
-            if self.isInsertPilotsAndGuards() && only_for_data
+            if only_for_data
                 invalud_row = NaN(1, self.nSubcarNum*self.nTimeslotNum);
                 invalud_col = NaN(self.nSubcarNum*self.nTimeslotNum, 1);
                 % mark redundant values - columns (X_DD invalid)
@@ -627,13 +519,6 @@ classdef OTFS < handle
                 s = s_mat(:);
             end
         end
-        
-        %{
-        get the received signal in delay Doppler domain
-        %}
-        function Y_DD = getYDD(self)
-            Y_DD = self.Y_DD;
-        end
     end
     
     %% detectors
@@ -689,12 +574,6 @@ classdef OTFS < handle
                 % Update mean and var (in the view of y[d])
                 for ele1=1:1:self.nSubcarNum
                     for ele2=1:1:self.nTimeslotNum
-                        % CE - jump the area for channel estimation
-                        if self.isInsertPilotsAndGuards()
-                            if ele1 >= self.ce_ydd_delay_beg && ele1 <= self.ce_ydd_delay_end && ele2 >= self.ce_ydd_doppl_beg && ele2 <= self.ce_ydd_doppl_end
-                                continue;
-                            end
-                        end
                         % origianl part
                         mean_int_hat = zeros(taps,1);
                         var_int_hat = zeros(taps,1);
@@ -710,15 +589,6 @@ classdef OTFS < handle
                             new_chan = add_term * (mp_ch_dd_alpha) * chan_coef(tap_no);
                             % calculate the mean and variance from other taps contributing to this tap
                             for i2=1:1:self.constellation_len
-                                % jump for CE area if use CE
-                                if self.isInsertPilotsAndGuards()
-                                    % only consider the place we have values
-                                    mp_ob_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum) + 1;
-                                    mp_ob_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
-                                    if mp_ob_mean_delay_sour >= self.ce_xdd_delay_beg && mp_ob_mean_delay_sour <= self.ce_xdd_delay_end && mp_ob_mean_doppl_sour >= self.ce_xdd_doppl_beg && mp_ob_mean_doppl_sour <= self.ce_xdd_doppl_end
-                                        continue;
-                                    end
-                                end
                                 mean_int_hat(tap_no) = mean_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * self.constellation(i2);
                                 var_int_hat(tap_no) = var_int_hat(tap_no) + p_map(self.nTimeslotNum*(ele1-1)+ele2,tap_no,i2) * abs(self.constellation(i2))^2;
                             end
@@ -742,14 +612,7 @@ classdef OTFS < handle
                 dum_eff_ele1 = zeros(taps,1);
                 dum_eff_ele2 = zeros(taps,1);
                 for ele1=1:1:self.nSubcarNum
-                    for ele2=1:1:self.nTimeslotNum
-                        % CE - jump the area for channel estimation
-                        if self.isInsertPilotsAndGuards()
-                            if ele1 >= self.ce_xdd_delay_beg && ele1 <= self.ce_xdd_delay_end && ele2 >= self.ce_xdd_doppl_beg && ele2 <= self.ce_xdd_doppl_end
-                                continue;
-                            end
-                        end
-                        
+                    for ele2=1:1:self.nTimeslotNum  
                         % original code
                         dum_sum_prob = zeros(self.constellation_len,1);
                         log_te_var = zeros(taps,self.constellation_len);
@@ -770,15 +633,7 @@ classdef OTFS < handle
                             eff_ele2 = mod(ele2-1+Doppler_taps(tap_no),self.nTimeslotNum) + 1;
                             dum_eff_ele1(tap_no) = eff_ele1;
                             dum_eff_ele2(tap_no) = eff_ele2;
-                            new_chan = add_term * add_term1 * chan_coef(tap_no);
-                            
-                            % only consider the place we have values
-                            mp_va_mean_delay_sour = mod(ele1 + delay_taps(tap_no), self.nSubcarNum);
-                            mp_va_mean_doppl_sour = mod(ele2 + Doppler_taps(tap_no), self.nTimeslotNum) + 1;
-                            if mp_va_mean_delay_sour >= self.ce_xdd_delay_beg && mp_va_mean_delay_sour <= self.ce_xdd_delay_end && mp_va_mean_doppl_sour >= self.ce_xdd_doppl_beg && mp_va_mean_doppl_sour <= self.ce_xdd_doppl_end
-                                continue;
-                            end
-                              
+                            new_chan = add_term * add_term1 * chan_coef(tap_no);            
                             for i2=1:1:self.constellation_len
                                 dum_sum_prob(i2) = abs(yv(self.nTimeslotNum*(eff_ele1-1)+eff_ele2)- mean_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no) - new_chan * self.constellation(i2))^2;
                                 dum_sum_prob(i2)= -(dum_sum_prob(i2)/var_int(self.nTimeslotNum*(eff_ele1-1)+eff_ele2,tap_no));
@@ -796,11 +651,6 @@ classdef OTFS < handle
                         for tap_no=1:1:taps
                             eff_ele1 = dum_eff_ele1(tap_no);
                             eff_ele2 = dum_eff_ele2(tap_no);
-                            
-                            if eff_ele1 >= self.ce_xdd_delay_beg && eff_ele1 <= self.ce_xdd_delay_end && eff_ele2 >= self.ce_xdd_doppl_beg && eff_ele2 <= self.ce_xdd_doppl_end
-                                continue;
-                            end
-
                             dum_sum = log_te_var(tap_no,:);
                             ln_qi_loc = ln_qi - dum_sum;
                             dum_sum = exp(ln_qi_loc - max(ln_qi_loc));
@@ -825,104 +675,18 @@ classdef OTFS < handle
             X_DD_est = zeros(self.nTimeslotNum, self.nSubcarNum);
             for ele1=1:1:self.nSubcarNum
                 for ele2=1:1:self.nTimeslotNum
-                    % CE - jump the area for channel estimation
-                    if self.isInsertPilotsAndGuards()
-                        if ele1 >= self.ce_xdd_delay_beg && ele1 <= self.ce_xdd_delay_end && ele2 >= self.ce_xdd_doppl_beg && ele2 <= self.ce_xdd_doppl_end
-                            continue;
-                        end
-                    end
                     [~,pos] = max(sum_prob_fin(self.nTimeslotNum*(ele1-1)+ele2,:));
                     X_DD_est(ele2,ele1) = self.constellation(pos);
                 end
             end
-            % extract symbols
-            symbols = zeros(self.nTimeslotNum*self.nSubcarNum - self.ce_xdd_num, 1);
-            % return
-            if ~self.isInsertPilotsAndGuards()
-                % no CE
-                symbols = X_DD_est.';
-                symbols = symbols(:);
-            else
-                % CE in use 
-                symbols_id = 1;
-                for doppl_id = 1:self.nTimeslotNum
-                    for delay_id = 1:self.nSubcarNum
-                        if doppl_id<self.ce_xdd_doppl_beg || doppl_id>self.ce_xdd_doppl_end || delay_id<self.ce_xdd_delay_beg || delay_id>self.ce_xdd_delay_end
-                            symbols(symbols_id) = X_DD_est(doppl_id, delay_id);
-                            symbols_id = symbols_id + 1;
-                        end
-                    end
-                end
-            end
+            % no CE
+            symbols = X_DD_est.';
+            symbols = symbols(:);
         end
     end
     
     %% support functions - general
     methods(Access=private)
-        %{
-        check whether the pilots & guards are inserted or not
-        %}
-        function is_done = isInsertPilotsAndGuards(self)
-            % check whether pilots is assigned or not
-            is_done = ~isempty(self.pilots);
-            % check whether X_DD_invalid area is calculated
-            is_done = is_done && ~isnan(self.ce_xdd_delay_beg) && ~isnan(self.ce_xdd_delay_end) && ~isnan(self.ce_xdd_doppl_beg) && ~isnan(self.ce_xdd_doppl_end);
-            % check whether CE area is calulated
-            is_done = is_done && ~isnan(self.ce_ydd_delay_beg) && ~isnan(self.ce_ydd_delay_end) && ~isnan(self.ce_ydd_doppl_beg) && ~isnan(self.ce_ydd_doppl_end);
-        end
-
-        %{
-        check whether the current position is in channel estimation area
-        @ce_area_tag:   notify whether CE area to check
-        @pos_delay:     the position on the delay axis for matrix or th position on the Doppler-delay axis for the vector
-        @pos_doppl:     the position on the Doppler axis. Not given means the position is for a Doppler-delay vector
-        %}
-        function is_in = isCurPosInCEXDDArea(delay_pos, varargin)
-            is_in = self.isCurPosInCEArea(self.CE_AREA_TAG_XDD, delay_pos, varargin);
-        end
-        function is_in = isCurPosInCEYDDArea(delay_pos, varargin)
-            is_in = self.isCurPosInCEArea(self.CE_AREA_TAG_YDD, delay_pos, varargin);
-        end
-        function is_in = isCurPosInCEArea(self, ce_area_tag, delay_pos, varargin)
-            % input check
-            if ismember(ce_area_tag, self.CE_AREA_TAGS)
-                error("The CE area tag is illegal.");
-            end
-            if isempty(varargin)
-                if delay_pos <= 0 || delay_pos > self.nSubcarNum*self.nTimeslotNum
-                    error("The vector position is out of the OTFS size.");
-                end
-            else
-                if delay_pos <= 0 || delay_pos > self.nSubcarNum
-                    error("The delay position is out of the subcarrier number.");
-                end
-                if varargin{1} <= 0 || varargin{1} > self.nTimeslotNum
-                    error("The Doppler position is out of the timeslot number.");
-                end
-            end
-            
-            % recalculate the position
-            pos_doppl = 0;
-            if isempty(varargin)
-                pos_doppl = delay_pos/self.nSubcarNum;
-                if pos_doppl == floor(pos_doppl)
-                    pos_doppl = floor(pos_doppl);
-                else
-                    pos_doppl = floor(pos_doppl) + 1;
-                end
-                delay_pos = delay_pos - (pos_doppl-1)*self.nSubcarNum;
-            else
-                pos_doppl = varargin{1};
-            end
-            % decide
-            if ce_area_tag == self.CE_AREA_TAG_XDD
-                is_in = delay_pos >= self.ce_xdd_delay_beg && delay_pos <= self.ce_xdd_delay_end && pos_doppl >= self.ce_xdd_doppl_beg && pos_doppl <= self.ce_xdd_doppl_end;
-            end
-            if ce_area_tag == self.CE_AREA_TAG_YDD
-                is_in = delay_pos >= self.ce_ydd_delay_beg && delay_pos <= self.ce_ydd_delay_end && pos_doppl >= self.ce_ydd_doppl_beg && pos_doppl <= self.ce_ydd_doppl_end;
-            end
-        end
-
         %{
         symbol mapping (hard)
         @syms: a vector of symbols
@@ -947,13 +711,22 @@ classdef OTFS < handle
     %% support function - Maths+
     methods(Access=private)
         %{
+        shuffle and select top n elements' indices
+        @total: 
+        %}
+        function idx = shufSelectTopNIdx(~, taps_max, p)
+            taps_idx_chaotic = randperm(taps_max);
+            idx = taps_idx_chaotic(1:p);
+        end
+
+        %{
         sort arrays based on the 
         @arrs:                arrays [arr_num, arr_data_num]
         @first_order_arr:     the 1st array id we follow the order
         @second_order_arr:    the 2nd array id we follow the order
         @descend:             descend order
         %}
-        function arrs = sortArrs(self, arrs, varargin)
+        function arrs = sortArrs(~, arrs, varargin)
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar,"first_order_arr", false, @(x) isscalar(x)&&isnumeric(x));
@@ -979,7 +752,6 @@ classdef OTFS < handle
             
             % retrieve 1st and 2nd arr
             arr1 = arrs(first_order_arr, :);
-            arr2 = arrs(second_order_arr, :);
             % sort - order
             sort_direction = 'ascend';
             if descend
@@ -1020,15 +792,6 @@ classdef OTFS < handle
             end
         end
     end
-end
-
-%% independent functions
-% select p random path indices from given paths
-% @taps_max: the maximal path number
-% @p: the path number we select
-function taps_selected_idx = Channl_SelectRandomPathIdx(taps_max, p)
-    taps_idx_chaotic = randperm(taps_max);
-    taps_selected_idx = taps_idx_chaotic(1:p);
 end
 
 % add cyclic prefix
