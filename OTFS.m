@@ -5,7 +5,6 @@ classdef OTFS < handle
         PULSE_IDEAL = 10;   % ideal pulses (if we use ideal pulses, `ISI_CANCEL_CP` is forced to chosen)
         PULSE_RECTA = 20;   % rectangular pulses
         % cyclic prefix
-        CP_NONE = 0;                                 % no cyclic prefix
         CP_ZERO = 10;                                % use zero guards to avoid ISI
         CP_ONE_FRAM = 20;                            % one cp for entire OTFS frame
         CP_ONE_FRAM_SUB = 21;                        % one cp for each OTFS subframe
@@ -35,6 +34,7 @@ classdef OTFS < handle
         pulse_type = OTFS.PULSE_RECTA;
         % cp
         cp_type = OTFS.CP_ONE_FRAM;
+        cp_len = 0;
         % detection
         constellation                               % constellation
         constellation_len = 0;
@@ -108,6 +108,7 @@ classdef OTFS < handle
                     self.chan_coef = in1;
                     self.delay_taps = in2;
                     self.doppler_taps = in3;
+                    self.cp_len = max(self.delay_taps);
                 end
             elseif isscalar(in1) && isscalar(in2) && isscalar(in3)
                 % scalar, random paths
@@ -154,7 +155,8 @@ classdef OTFS < handle
                     self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (ones(1, p)+1i*ones(1, p))) + sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
                 else
                     self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p))); % use Rayleigh fading by default
-                end                
+                end
+                self.cp_len = max(self.delay_taps);
             else
                 error("The given CSI is not recognised.");
             end
@@ -183,6 +185,7 @@ classdef OTFS < handle
                 self.doppler_taps = [self.doppler_taps, ki];
             end
             self.taps_num = self.taps_num + 1;
+            self.cp_len = max(self.delay_taps);
         end
         
         %{
@@ -202,25 +205,24 @@ classdef OTFS < handle
             else
                 error("The noise input must be a scalar for power or a vector for fixed noise.");
             end
-            
-            % add CP
-            cp_len = max(self.delay_taps);
-            s_cp = Channel_AddCP(self.s, cp_len);
-            % pass the channel
-            s_chan = 0;
-            for tap_id = 1:self.taps_num
-                s_chan_tmp = self.chan_coef(tap_id)*circshift( ...
-                    [ ...
-                        s_cp.*exp(1j*2*pi/self.nSubcarNum*(-cp_len:-cp_len+length(s_cp)-1)*self.doppler_taps(tap_id)/self.nTimeslotNum).'; ...
-                        zeros(cp_len,1) ...
-                    ], ...
-                    self.delay_taps(tap_id) ...
-                );
-                s_chan = s_chan+s_chan_tmp;
+            % pass based on the pulse type
+            if self.pulse_type == self.PULSE_IDEAL
+                
+            elseif self.pulse_type == self.PULSE_RECTA
+                [s_cp, s_cp_t] = self.addCP();
+                % pass the channel
+                s_chan = 0;
+                for tap_id = 1:self.taps_num
+                    s_chan_tmp = self.chan_coef(tap_id)*circshift([ ...
+                            s_cp.*exp(1j*2*pi*self.doppler_taps(tap_id)*s_cp_t/self.nSubcarNum/self.nTimeslotNum); ...
+                            zeros(self.cp_len,1) ...
+                        ], ...
+                        self.delay_taps(tap_id) ...
+                    );
+                    s_chan = s_chan+s_chan_tmp;
+                end
+                self.r = self.removeCP(s_chan);
             end
-            self.r = s_chan;
-            % remove CP
-            self.r = self.r(cp_len+1:cp_len+(self.nTimeslotNum*self.nSubcarNum));
             % add noise
             if isscalar(No)
                 if No > 0
@@ -239,15 +241,11 @@ classdef OTFS < handle
         %}
         function rg = demodulate(self)
             r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
-            % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
-            self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum); 
+            self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum);  % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
             Y_FT = self.Y_TF.';
-            % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
-            Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum);
-            % return
-            rg = OTFSResGrid(Y_DD);
+            Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
+            rg = OTFSResGrid(Y_DD); % return a resource grid
         end
-        
         
         %{
         detect
@@ -488,40 +486,35 @@ classdef OTFS < handle
             end
         end
         
-        
         %{
         get the signal in the TF domain
         %}
-        function X_TF = getX2TF(self)
+        function X_TF = getXTF(self)
             X_TF = self.X_TF;
         end
         
         %{
         get the signal in the time domain
+        @fft_size: the size of fft
         %}
-        function s = getX2T(self, varargin)
-            % Inputs Name-Value Pair 
-            inPar = inputParser;
-            addParameter(inPar,'fft_size', 0, @isnumeric);
-            inPar.KeepUnmatched = true;     % Allow unmatched cases
-            inPar.CaseSensitive = false;    % Allow capital or small characters
-            % fft size
-            parse(inPar, varargin{:}); 
-            fft_size = inPar.Results.fft_size;
-            
+        function s = getXT(self, varargin)
+            % set fft size
+            fft_size = 0;
+            if ~isempty(varargin)
+                fft_size = floor(varargin{1});
+            end
             % if fft resolution is lower than subcarrier number, we choose the subcarrier number as the resolution
             if fft_size < self.nSubcarNum
                 s = self.s;
             else 
-                % Heisenberg transform
-                s_mat = ifft(self.X_TF, fft_size)*sqrt(self.nSubcarNum);
-                % vectorize
-                s = s_mat(:);
+                s_mat = ifft(self.X_TF, fft_size)*sqrt(self.nSubcarNum); % Heisenberg transform
+                s = s_mat(:); % vectorize
             end
         end
     end
     
-    %% detectors
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % detectors
     methods(Access=private)
         %{
         MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
@@ -685,30 +678,8 @@ classdef OTFS < handle
         end
     end
     
-    %% support functions - general
-    methods(Access=private)
-        %{
-        symbol mapping (hard)
-        @syms: a vector of symbols
-        @constellation: the constellation to map
-        %}
-        function syms_mapped = symmap(self, syms)
-            if ~isvector(syms)
-                error("Symbols must be into a vector form to map.");
-            end
-            % the input must be a column vector
-            is_syms_col = iscolumn(syms);
-            syms = syms(:);
-            syms_dis = abs(syms - self.constellation).^2;
-            [~,syms_dis_min_idx] =  min(syms_dis,[],2);
-            syms_mapped = self.constellation(syms_dis_min_idx);
-            if is_syms_col
-                syms_mapped = syms_mapped(:);
-            end
-        end
-    end
-        
-    %% support function - Maths+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % private methods
     methods(Access=private)
         %{
         shuffle and select top n elements' indices
@@ -717,6 +688,41 @@ classdef OTFS < handle
         function idx = shufSelectTopNIdx(~, taps_max, p)
             taps_idx_chaotic = randperm(taps_max);
             idx = taps_idx_chaotic(1:p);
+        end
+
+        %{
+        add cyclic prefix
+        %}
+        function [s_cp, s_cp_t] = addCP(self)
+            if self.cp_type == self.CP_ZERO
+                s_cp = self.s;
+                s_cp_t = (0:self.nSubcarNum*self.nTimeslotNum-1)';
+            elseif self.cp_type == self.CP_ONE_FRAM
+                s_cp = [self.s(end - self.cp_len + 1 : end);self.s];
+                s_cp_t = (-self.cp_len:self.nSubcarNum*self.nTimeslotNum-1)';
+            elseif self.cp_type == self.CP_ONE_FRAM_SUB
+                s_mat = reshape(self.s, self.nSubcarNum, self.nTimeslotNum);
+                s_mat = [s_mat(end - self.cp_len + 1 : end, :); s_mat];
+                s_cp = s_mat(:);
+                s_cp_t_mat = repmat((-self.cp_len:self.nSubcarNum-1)', 1, self.nTimeslotNum);
+                s_cp_t = s_cp_t_mat(:);
+            end
+        end
+
+        %{
+        remove cyclic prefix
+        @s_chan: channel output
+        %}
+        function removeCP(self, s_chan)
+            if self.cp_type == self.CP_ZERO
+                self.r = s_chan;
+            elseif self.cp_type == self.CP_ONE_FRAM
+                self.r = s_chan(self.cp_len+1 : self.cp_len+self.nTimeslotNum*self.nSubcarNum);
+            elseif self.cp_type == self.CP_ONE_FRAM_SUB
+                r_mat = reshape(s_chan, self.nSubcarNum, self.nTimeslotNum);
+                r_mat = r_mat(self.cp_len+1:self.cp_len+self.nTimeslotNum*self.nSubcarNum, :);
+                self.r = r_mat(:);
+            end
         end
 
         %{
@@ -791,13 +797,25 @@ classdef OTFS < handle
                 arrs(:, seg_beg:seg_end) = segs;
             end
         end
-    end
-end
 
-% add cyclic prefix
-% @s: time domain signal
-% @cp_len: the cyclic prefix length
-function s_cp = Channel_AddCP(s, cp_len)
-    syms_len = length(s);
-    s_cp = [s(syms_len - cp_len + 1 : syms_len);s];
+        %{
+        symbol mapping (hard)
+        @syms: a vector of symbols
+        @constellation: the constellation to map
+        %}
+        function syms_mapped = symmap(self, syms)
+            if ~isvector(syms)
+                error("Symbols must be into a vector form to map.");
+            end
+            % the input must be a column vector
+            is_syms_col = iscolumn(syms);
+            syms = syms(:);
+            syms_dis = abs(syms - self.constellation).^2;
+            [~,syms_dis_min_idx] =  min(syms_dis,[],2);
+            syms_mapped = self.constellation(syms_dis_min_idx);
+            if is_syms_col
+                syms_mapped = syms_mapped(:);
+            end
+        end
+    end
 end
