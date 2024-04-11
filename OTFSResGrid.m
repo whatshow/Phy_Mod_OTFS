@@ -26,13 +26,13 @@ classdef OTFSResGrid < handle
         pilot_loc_doppl_1st = 0;                    % 1st (lowest) pilot location in Doppler axis
         % pilot location
         pilot_loc_type = OTFSResGrid.PILOT_LOC_CENTER;
-        % channel estimation area in X_DD
+        % channel estimation area in content
         pg_num = 0;
         pg_delay_beg = NaN;
         pg_delay_end = NaN;
         pg_doppl_beg = NaN;
         pg_doppl_end = NaN;
-        % channel estimation area in Y_DD
+        % channel estimation area in content
         ce_num = 0;
         ce_delay_beg = NaN;
         ce_delay_end = NaN;
@@ -72,7 +72,7 @@ classdef OTFSResGrid < handle
                 end
             else
                 self.content = in1;
-                [self.nTimeslotNum, self.nSubcarNum] = shape(self.content);
+                [self.nTimeslotNum, self.nSubcarNum] = size(self.content);
             end
             % take inputs - optional
             parse(inPar, varargin{varargin_id_beg:end});
@@ -143,10 +143,10 @@ classdef OTFSResGrid < handle
         %{
         pulse settings
         %}
-        function pulse2Ideal(self)
+        function setPulse2Ideal(self)
             self.pulse_type = self.PULSE_IDEAL;
         end
-        function pulse2Recta(self)
+        function setPulse2Recta(self)
             self.pulse_type = self.PULSE_RECTA;
         end
 
@@ -157,7 +157,7 @@ classdef OTFSResGrid < handle
         function [y, his, lis, kis] = demap(self, varargin)
             % optional inputs - register
             inPar = inputParser;
-            addParameter(inPar, 'threshold', [], @(x) isempty(x)||isscalar(x)&&isnumeric(x));
+            addParameter(inPar, 'threshold', 0, @(x) isscalar(x)&&isnumeric(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
             inPar.CaseSensitive = false;    % Allow capital or small characters
             parse(inPar, varargin{:});
@@ -165,7 +165,7 @@ classdef OTFSResGrid < handle
             threshold = inPar.Results.threshold;
             % input check
             % input check - threshold
-            if ~isempty(threshold) && threshold < 0
+            if threshold < 0
                 error("The threshould must be non-negative.");
             end
             % input check - pulse_type
@@ -191,6 +191,32 @@ classdef OTFSResGrid < handle
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % issers, getters, setters
     methods
+        %{
+        clone
+        %}
+        function rg = clone(self)
+            rg = OTFSResGrid(self.content);
+            rg.zp_len = self.zp_len;
+            rg.pulse_type = self.pulse_type;
+            rg.pilots = self.pilots;
+            rg.pilots_len = self.pilots_len;
+            rg.pilots_num_delay = self.pilots_num_delay;
+            rg.pilots_num_doppl = self.pilots_num_doppl;
+            rg.pilot_loc_delay_1st = self.pilot_loc_delay_1st;
+            rg.pilot_loc_doppl_1st = self.pilot_loc_doppl_1st;
+            rg.pilot_loc_type = self.pilot_loc_type;
+            rg.pg_num = self.pg_num;
+            rg.pg_delay_beg = self.pg_delay_beg;
+            rg.pg_delay_end = self.pg_delay_end;
+            rg.pg_doppl_beg = self.pg_doppl_beg;
+            rg.pg_doppl_end = self.pg_doppl_end;
+            rg.ce_num = self.ce_num;
+            rg.ce_delay_beg = self.ce_delay_beg;
+            rg.ce_delay_end = self.ce_delay_end;
+            rg.ce_doppl_beg = self.ce_doppl_beg;
+            rg.ce_doppl_end = self.ce_doppl_end;
+        end
+
         %{
         return zero padding length
         %}
@@ -223,6 +249,28 @@ classdef OTFSResGrid < handle
         end
 
         %{
+        get the area of pilots and guards
+        %}
+        function [pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end] = getAreaPG(self)
+            pg_num = self.pg_num;
+            pg_delay_beg = self.pg_delay_beg;
+            pg_delay_end = self.pg_delay_end;
+            pg_doppl_beg = self.pg_doppl_beg;
+            pg_doppl_end = self.pg_doppl_end;
+        end
+
+        %{
+        get the area of channel estimation
+        %}
+        function [ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end] = getAreaCE(self)
+            ce_num = self.ce_num;
+            ce_delay_beg = self.ce_delay_beg;
+            ce_delay_end = self.ce_delay_end;
+            ce_doppl_beg = self.ce_doppl_beg;
+            ce_doppl_end = self.ce_doppl_end;
+        end
+
+        %{
         check pulse type
         %}
         function is_pulse_type = isPulseIdeal(self)
@@ -233,6 +281,13 @@ classdef OTFSResGrid < handle
         end
         
         %{
+        set content
+        %}
+        function setContent(self, content)
+            self.content = content;
+        end
+
+        %{
         get content size
         %}
         function [nSubcarNum, nTimeslotNum] = getContentSize(self)
@@ -242,17 +297,17 @@ classdef OTFSResGrid < handle
 
         %{
         get content
-        @isvector: if true, the returned result is a vector
+        @isVector: if true, the returned result is a vector
         %}
         function content = getContent(self, varargin)
             % optional inputs - register
             inPar = inputParser;
-            addParameter(inPar, 'isvector', false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar, 'isVector', false, @(x) isscalar(x)&&islogical(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
             inPar.CaseSensitive = false;    % Allow capital or small characters
             parse(inPar, varargin{:});
             % take inputs
-            isvector = inPar.Results.isvector;
+            isvector = inPar.Results.isVector;
             % return
             if isvector
                 content = self.content.';
@@ -264,7 +319,6 @@ classdef OTFSResGrid < handle
 
         %{
         get content - CE
-        @isvector: if true, the returned result is a vector
         %}
         function ce_area = getContentCE(self)
             if self.ce_num == 0
@@ -404,20 +458,26 @@ classdef OTFSResGrid < handle
                 % some pilots
                 % calulate the data number for two axises
                 data_delay_num = (self.nSubcarNum - self.pilots_num_delay - guard_delay_num_neg - guard_delay_num_pos);
-                data_doppler_num = self.nTimeslotNum - self.pilots_num_doppl - guard_doppl_num_neg - guard_doppl_num_pos;
+                data_doppl_num = self.nTimeslotNum - self.pilots_num_doppl - guard_doppl_num_neg - guard_doppl_num_pos;
                 % calculate the pilot start point shift due to asymmetric guards
-                pilot_shift_delay_pos = guard_delay_num_pos - guard_delay_num_neg; 
-                pilot_shift_doppler_pos = guard_doppl_num_pos - guard_doppl_num_neg;
+                guard_delay_pos_extra = guard_delay_num_pos - guard_delay_num_neg;
+                if guard_delay_pos_extra > data_delay_num
+                    guard_delay_pos_extra = 0;
+                end
+                guard_doppl_pos_extra = guard_doppl_num_pos - guard_doppl_num_neg;
+                if guard_doppl_pos_extra > data_doppl_num
+                    guard_doppl_pos_extra = 0;
+                end
                 % locate the 1st coordinates of the pilots (following the positive direction of axises)
                 self.pilot_loc_delay_1st = 0;
                 self.pilot_loc_doppl_1st = 0;
                 switch self.pilot_loc_type
                     case self.PILOT_LOC_CENTER
-                        self.pilot_loc_delay_1st = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        self.pilot_loc_doppl_1st = floor(data_doppler_num/2) + guard_doppl_num_neg + pilot_shift_doppler_pos + 1;
+                        self.pilot_loc_delay_1st = floor(data_delay_num/2)+ guard_delay_pos_extra + guard_delay_num_neg + 1;
+                        self.pilot_loc_doppl_1st = floor(data_doppl_num/2) + guard_doppl_pos_extra + guard_doppl_num_neg + 1;
                     case self.PILOT_LOC_ZP 
                         self.pilot_loc_delay_1st = floor(data_delay_num/2) + guard_delay_num_neg + pilot_shift_delay_pos + 1;
-                        self.pilot_loc_doppl_1st = data_doppler_num + guard_doppl_num_neg + 1;
+                        self.pilot_loc_doppl_1st = data_doppl_num + guard_doppl_num_neg + 1;
                 end
                 % allocate pilots
                 self.content(self.pilot_loc_doppl_1st:self.pilot_loc_doppl_1st+self.pilots_num_doppl-1, self.pilot_loc_delay_1st:self.pilot_loc_delay_1st+self.pilots_num_delay-1) = transpose(reshape(self.pilots, self.pilots_num_delay, self.pilots_num_doppl));
@@ -543,9 +603,9 @@ classdef OTFSResGrid < handle
                         li = delay_id - self.pilot_loc_delay_1st;
                         ki = doppl_id - self.pilot_loc_doppl_1st;
                         if self.pulse_type == self.PULSE_IDEAL
-                            pss_beta = exp(1j*2*pi*li*ki/self.nSubcarNum/self.nTimeslotNum);
+                            pss_beta = exp(-2j*pi*li*ki/self.nSubcarNum/self.nTimeslotNum);
                         elseif self.pulse_type == self.PULSE_RECTA
-                            pss_beta = exp(1j*2*pi*(self.pilot_loc_delay_1st - 1)*ki/self.nSubcarNum/self.nTimeslotNum);
+                            pss_beta = exp(2j*pi*(self.pilot_loc_delay_1st - 1)*ki/self.nSubcarNum/self.nTimeslotNum);
                         end
                         hi = pss_y/self.pilots/pss_beta;
                         his(end+1) = hi;

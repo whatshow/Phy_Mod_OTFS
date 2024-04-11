@@ -18,13 +18,18 @@ classdef OTFS < handle
         DETECT_CSI_TYPES = [OTFS.DETECT_CSI_PERFECT, OTFS.DETECT_CSI_CE, OTFS.DETECT_CSI_IN];
     end
     properties
+        % RG infomation
         nSubcarNum {mustBeInteger}                  % subcarrier number
         nTimeslotNum {mustBeInteger}                % timeslot number
+        sig_len = 0;                                % the total signal length
+        rg
+        % OTFS process signal
         X_TF                                        % Tx value in the time-frequency(TF) domain
         s                                           % Tx value in the time domain (array)
         H                                           % channel in the time domain
         r                                           % Rx value in the time domain (array)
         Y_TF                                        % Rx value in the TF domain
+        Y_DD
         % channel
         taps_num = 0                                % paths number           
         chan_coef                                   % path gain, a row vector
@@ -44,15 +49,25 @@ classdef OTFS < handle
     % General OTFS Methods
     methods
         %{
-        modulate
-        @rg: an OTFS resource grid
+        modulate (use fast method by default)
+        @rg:        an OTFS resource grid
+        @isFast:    DD domain -> TD domain (no X_TF) 
         %}
-        function modulate(self, rg)
+        function modulate(self, rg, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"isFast", true, @(x) isscalar(x)&islogical(x)); 
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            isFast = inPar.Results.isFast;
+            % input check
             if ~isa(rg, 'OTFSResGrid')
                 error("The input must be an OTFS resource grid.");
             end
-            % load RG settings
+            % load RG
             [self.nSubcarNum, self.nTimeslotNum] = rg.getContentSize();
+            self.sig_len = self.nSubcarNum*self.nTimeslotNum;
             if rg.isPulseIdeal()
                 self.pulse_type = self.PULSE_IDEAL;
             elseif rg.isPulseRecta()
@@ -60,13 +75,20 @@ classdef OTFS < handle
             else
                 error("Pulse shaping is not given in the resource grid.");
             end
-            % load RG data
-            X_DD = rg.getContent();
+            self.rg = rg.clone();
+            X_DD = self.rg.getContent();
             % modulate
-            X_FT = fft(ifft(X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum); % ISFFT 
-            self.X_TF = X_FT.'; % X_TF is [nSubcarNum, nTimeslotNum]
-            s_mat = ifft(self.X_TF)*sqrt(self.nSubcarNum); % Heisenberg transform
-            self.s = s_mat(:); % vectorize
+            if self.pulse_type == self.PULSE_RECTA
+                if isFast
+                    s_mat = ifft(X_DD).'*sqrt(self.nTimeslotNum);
+                    self.s = s_mat(:);
+                else
+                    X_FT = fft(ifft(X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum); % ISFFT 
+                    self.X_TF = X_FT.'; % X_TF is [nSubcarNum, nTimeslotNum]
+                    s_mat = ifft(self.X_TF)*sqrt(self.nSubcarNum); % Heisenberg transform
+                    self.s = s_mat(:);
+                end
+            end
         end
 
         % set channel (in1, in2, in3)
@@ -74,7 +96,7 @@ classdef OTFS < handle
         % @in1->his:        the path gains
         % @in2->lis:        the delays
         % @in3->kis:        the doppler shifts
-        % set a random channel (overwritten the channel setting)
+        % set a random channel (overwritten the channel setting; use Rayleigh fading if not select channel model)
         % @in1->p:          the path number
         % @in2->lmax:       the maxmimal delay index
         % @in3->kmax:       the maximal Doppler index (can be fractional)
@@ -115,11 +137,16 @@ classdef OTFS < handle
                 p = in1;
                 lmax = in2;
                 kmax = in3;
-                if kmax ~= floor(kmax)
+                kmax_frac = kmax - floor(kmax);
+                kmax = floor(kmax);
+                if kmax_frac > eps
                     force_frac = true;
                 else
                     if ~isempty(varargin)
                         force_frac = varargin{1};
+                        if force_frac
+                            kmax_frac = 0.5;
+                        end
                     end
                 end
                 % input check
@@ -137,7 +164,7 @@ classdef OTFS < handle
                 self.delay_taps(find(self.delay_taps == min(self.delay_taps), 1)) = 0;
                 % CSI - doppler
                 self.doppler_taps = Doppler_taps_all(taps_selected_idx);
-                if force_frac % add fractional Doppler
+                if force_frac   % add fractional Doppler
                     doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
                     doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                     doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
@@ -199,19 +226,19 @@ classdef OTFS < handle
                     error("The noise power must be positive.");
                 end
             elseif isvector(No)
-                if length(No) ~= self.nSubcarNum*self.nTimeslotNum
-                    error("The noise vector length must be %d.", self.nSubcarNum*self.nTimeslotNum);
+                if length(No) ~= self.sig_len
+                    error("The noise vector length must be %d.", self.sig_len);
                 end
             else
                 error("The noise input must be a scalar for power or a vector for fixed noise.");
             end
             % pass based on the pulse type
+            s_chan = 0;
             if self.pulse_type == self.PULSE_IDEAL
-                
+                H_DD = self.buildIdealChannel(self.taps_num, self.chan_coef, self.delay_taps, self.doppler_taps);
+                s_chan = H_DD*self.rg.getContent("isVector", true);
             elseif self.pulse_type == self.PULSE_RECTA
                 [s_cp, s_cp_t] = self.addCP();
-                % pass the channel
-                s_chan = 0;
                 for tap_id = 1:self.taps_num
                     s_chan_tmp = self.chan_coef(tap_id)*circshift([ ...
                             s_cp.*exp(1j*2*pi*self.doppler_taps(tap_id)*s_cp_t/self.nSubcarNum/self.nTimeslotNum); ...
@@ -221,30 +248,49 @@ classdef OTFS < handle
                     );
                     s_chan = s_chan+s_chan_tmp;
                 end
-                self.r = self.removeCP(s_chan);
+                s_chan = self.removeCP(s_chan);
             end
             % add noise
             if isscalar(No)
-                if No > 0
-                    noise = sqrt(No/2)*(randn(self.nSubcarNum*self.nTimeslotNum, 1) + 1i*randn(self.nSubcarNum*self.nTimeslotNum, 1));
-                    self.r = self.r + noise;
-                end
+                noise = sqrt(No/2)*(randn(self.sig_len, 1) + 1i*randn(self.sig_len, 1));
+                s_chan = s_chan + noise;
             elseif isvector(No)
-                self.r = self.r + No;
+                s_chan = s_chan + No;
             end
-            % return
-            r = self.r;
+            % assign to Rx
+            if self.pulse_type == self.PULSE_IDEAL
+                self.Y_DD = reshape(s_chan, self.nSubcarNum, self.nTimeslotNum).';
+            elseif self.pulse_type == self.PULSE_RECTA
+                self.r = s_chan;    % to time domain
+                r = s_chan;
+            end
         end
 
         %{
-        demodulate
+        demodulate (use fast method by default)
+        @isFast:    TD domain -> DD domain (no Y_TF) 
         %}
-        function rg = demodulate(self)
-            r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
-            self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum);  % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
-            Y_FT = self.Y_TF.';
-            Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
-            rg = OTFSResGrid(Y_DD); % return a resource grid
+        function rg = demodulate(self, varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"isFast", true, @(x) isscalar(x)&islogical(x)); 
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            isFast = inPar.Results.isFast;
+            % demodulate
+            if self.pulse_type == self.PULSE_RECTA
+                r_mat = reshape(self.r, self.nSubcarNum, self.nTimeslotNum);
+                if isFast
+                    self.Y_DD = fft(r_mat.')/sqrt(self.nTimeslotNum);
+                else 
+                    self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum);  % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
+                    Y_FT = self.Y_TF.';
+                    self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
+                end
+            end
+            self.rg.setContent(self.Y_DD);
+            rg = self.rg;
         end
         
         %{
@@ -340,98 +386,45 @@ classdef OTFS < handle
     % Getters & Setters
     methods
         %{
-        Get the channel matrix in Delay Doppler Domain (using the rectangular waveform)
-        @chan_coef:         the channel gains
-        @delay_taps:        the channel delays
-        @doppler_taps:      the channel Dopplers
-        @only_for_data:     whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
+        Get the channel matrix in Delay Doppler Domain
+        @his:   the channel gains
+        @lis:   the channel delays
+        @kis:   the channel Dopplers
+        @data_only: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
         %}
         function H_DD = getChannel(self, varargin)
-            % optional inputs - register
+            % label inputs
             inPar = inputParser;
-            addParameter(inPar,"chan_coef", [], @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar,"delay_taps", [], @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar,"doppler_taps", [], @(x) isvector(x)&&isnumeric(x));
-            addParameter(inPar,"only_for_data", true, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar,"data_only", true, @(x) isscalar(x)&&islogical(x));
             inPar.KeepUnmatched = true;
             inPar.CaseSensitive = false;
             parse(inPar, varargin{:});
-            % optional inputs - assign
-            in_chan_coef = inPar.Results.chan_coef;
-            in_delay_taps = inPar.Results.delay_taps;
-            in_doppler_taps = inPar.Results.doppler_taps;
-            only_for_data = inPar.Results.only_for_data;
-            % input check
-            % input check - csi
-            csi_cond = sum(~isempty(in_chan_coef) + ~isempty(in_delay_taps) + ~isempty(in_doppler_taps));
-            if csi_cond == 1 || csi_cond == 2
-                error("If you give CSI, you have to give channel gains, delays and Dopplers together.");
-            end
-            if csi_cond == 3
-                in_taps_num = length(in_chan_coef);
-                if in_taps_num ~= length(in_delay_taps) && in_taps_num ~= length(in_doppler_taps)
-                    error("The input CSI (gains, delays and dopplers) must have the same length.");
-                end
-            else
-                in_taps_num = self.taps_num;
-            end
-            
-            % reset the CSI if not input
-            if csi_cond == 0
-                in_chan_coef = self.chan_coef;
-                in_delay_taps = self.delay_taps;
-                in_doppler_taps = self.doppler_taps;
-            end
-            % build H_DD
-            H_DD = zeros(self.nTimeslotNum*self.nSubcarNum, self.nTimeslotNum*self.nSubcarNum); % intialize the return channel
-            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum); % DFT matrix
-            idftmat = conj(dftmat); % IDFT matrix 
-            piMat = eye(self.nTimeslotNum*self.nSubcarNum); % permutation matrix (from the delay) -> pi
-            % accumulate all paths
-            for tap_id = 1:in_taps_num
-                hi = in_chan_coef(tap_id);
-                li = in_delay_taps(tap_id);
-                ki = in_doppler_taps(tap_id);
-                % delay
-                piMati = circshift(piMat, li); 
-                % Doppler
-                deltaMat_diag = exp(1j*2*pi*ki/(self.nTimeslotNum*self.nSubcarNum)*(0:1:self.nTimeslotNum*self.nSubcarNum-1));
-                deltaMati = diag(deltaMat_diag);
-                % Pi, Qi, & Ti
-                Pi = kron(dftmat, eye(self.nSubcarNum))*piMati; 
-                Qi = deltaMati*kron(idftmat, eye(self.nSubcarNum));
-                Ti = Pi*Qi;
-                H_DD = H_DD + hi*Ti;
-            end
-            % remove redundant values
-            if only_for_data
-                invalud_row = NaN(1, self.nSubcarNum*self.nTimeslotNum);
-                invalud_col = NaN(self.nSubcarNum*self.nTimeslotNum, 1);
-                % mark redundant values - columns (X_DD invalid)
-                for doppl_id = self.ce_xdd_doppl_beg:self.ce_xdd_doppl_end
-                    for delay_id = self.ce_xdd_delay_beg:self.ce_xdd_delay_end
-                        col_id = (doppl_id-1)*self.nSubcarNum + delay_id;
-                        H_DD(:, col_id) = invalud_col;
-                        if doppl_id == 2 && delay_id == 50
-                            assert(sum(isnan(H_DD(:, col_id))) == self.nSubcarNum*self.nTimeslotNum);
-                        end
+            data_only = inPar.Results.data_only;
+            % input check & init
+            p = self.taps_num;
+            his = self.chan_coef;
+            lis = self.delay_taps;
+            kis = self.doppler_taps;
+            if ~isempty(varargin)
+                if length(varargin) >= 4
+                    p = length(varargin{1});
+                    his = varargin{2};
+                    lis = varargin{3};
+                    kis = varargin{4};
+                    if p ~= length(lis) && p ~= length(kis)
+                        error("The input CSI (gains, delays and dopplers) must have the same length.");
                     end
                 end
-                % mark redundant values - rows (Y_DD invalid)
-                for doppl_id = self.ce_ydd_doppl_beg:self.ce_ydd_doppl_end
-                    for delay_id = self.ce_ydd_delay_beg:self.ce_ydd_delay_end
-                        row_id = (doppl_id-1)*self.nSubcarNum + delay_id;
-                        H_DD(row_id, :) = invalud_row;
-                    end
-                end
-                % remove redundant values
-                % remove redundant values - columns
-                col_idx = ((sum(isnan(H_DD)) == self.nSubcarNum*self.nTimeslotNum));
-                H_DD(:, col_idx) = [];
-                % remove - rows
-                [~, H_DD_col_num] = size(H_DD);
-                row_idx = sum(isnan(H_DD), 2) == H_DD_col_num;
-                H_DD(row_idx, :) = [];
+            end
+            % build the channel
+            if self.pulse_type == self.PULSE_IDEAL
+                H_DD = self.buildIdealChannel(p, his, lis, kis);
+            elseif self.pulse_type == self.PULSE_RECTA
+                H_DD = self.buildRectaChannel(p, his, lis, kis);
+            end
+            % remove the channel for PG & CE
+            if data_only
+                H_DD = self.removeNoDAChannel(H_DD);
             end
         end
         
@@ -713,15 +706,15 @@ classdef OTFS < handle
         remove cyclic prefix
         @s_chan: channel output
         %}
-        function removeCP(self, s_chan)
+        function s_chan_rm = removeCP(self, s_chan)
             if self.cp_type == self.CP_ZERO
-                self.r = s_chan;
+                s_chan_rm = s_chan;
             elseif self.cp_type == self.CP_ONE_FRAM
-                self.r = s_chan(self.cp_len+1 : self.cp_len+self.nTimeslotNum*self.nSubcarNum);
+                s_chan_rm = s_chan(self.cp_len+1 : self.cp_len+self.nTimeslotNum*self.nSubcarNum);
             elseif self.cp_type == self.CP_ONE_FRAM_SUB
-                r_mat = reshape(s_chan, self.nSubcarNum, self.nTimeslotNum);
-                r_mat = r_mat(self.cp_len+1:self.cp_len+self.nTimeslotNum*self.nSubcarNum, :);
-                self.r = r_mat(:);
+                s_chan_mat = reshape(s_chan, self.nSubcarNum, self.nTimeslotNum);
+                s_chan_rm_mat = s_chan_mat(self.cp_len+1:self.cp_len+self.nTimeslotNum*self.nSubcarNum, :);
+                s_chan_rm = s_chan_rm_mat(:);
             end
         end
 
@@ -795,6 +788,110 @@ classdef OTFS < handle
                 end
                 % arrs - sort
                 arrs(:, seg_beg:seg_end) = segs;
+            end
+        end
+
+        %{
+        remove non-data from DD channel
+        @H_DD: the DD channel from
+        %}
+        function H_DD = removeNoDAChannel(self, H_DD)
+            invalud_row = NaN(1, self.sig_len);
+            invalud_col = NaN(self.sig_len, 1);
+            [pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end] = self.rg.getAreaPG();
+            [ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end] = self.rg.getAreaCE();
+            % mark redundant values - columns (PG area)
+            if pg_num > 0
+                for doppl_id = pg_delay_beg:pg_delay_end
+                    for delay_id = pg_doppl_beg:pg_doppl_end
+                        col_id = (doppl_id-1)*self.nSubcarNum + delay_id;
+                        H_DD(:, col_id) = invalud_col;
+                    end
+                end
+            end
+            % mark redundant values - rows (CE area)
+            if ce_num > 0
+                for doppl_id = ce_delay_beg:ce_delay_end
+                    for delay_id = ce_doppl_beg:ce_doppl_end
+                        row_id = (doppl_id-1)*self.nSubcarNum + delay_id;
+                        H_DD(row_id, :) = invalud_row;
+                    end
+                end
+            end
+            % remove
+            % remove - columns
+            if pg_num > 0
+                col_idx = ((sum(isnan(H_DD)) == self.sig_len));
+                H_DD(:, col_idx) = [];
+            end
+            % remove - rows
+            if ce_num > 0
+                [~, H_DD_col_num] = size(H_DD);
+                row_idx = sum(isnan(H_DD), 2) == H_DD_col_num;
+                H_DD(row_idx, :) = [];
+            end
+        end
+
+        %{
+        build the ideal pulse DD channel (callable after modulate)
+        @taps_num:  the number of paths
+        @his:       the channel gains
+        @lis:       the channel delays
+        @kis:       the channel dopplers
+        %}
+        function H_DD = buildIdealChannel(self, p, his, lis, kis)
+            % input check
+            if self.pulse_type ~= self.PULSE_IDEAL
+                error("Cannot build the ideal pulse DD channel while not using ideal pulse.");
+            end
+            hw = zeros(self.nTimeslotNum, self.nSubcarNum);
+            H_DD = zeros(self.sig_len, self.sig_len);
+            for l = 1:self.nSubcarNum
+                for k = 1:self.nTimeslotNum
+                    for tap_id = 1:p
+                        hi = his(tap_id);
+                        li = lis(tap_id);
+                        ki = kis(tap_id);
+                        hw(k, l)= hw(k, l) + 1/self.sig_len*hi*exp(-2j*pi*li*ki/self.sig_len)*sum(exp(2j*pi*(l-li)*(0:self.nSubcarNum-1)/self.nSubcarNum))*sum(exp(-2j*pi*(k-ki)*(0:self.nTimeslotNum-1)/self.nTimeslotNum));
+                    end
+                    H_DD = H_DD + hw(k, l)*kron(circshift(eye(self.nTimeslotNum), k), circshift(eye(self.nSubcarNum), l));
+                end
+            end
+        end
+
+        %{
+        build the rectangular pulse DD channel (callable after modulate)
+        @taps_num:  the number of paths
+        @his:       the channel gains
+        @lis:       the channel delays
+        @kis:       the channel dopplers
+        %}
+        function H_DD = buildRectaChannel(self, p, his, lis, kis)
+            % input check
+            if self.pulse_type ~= self.PULSE_RECTA
+                error("Cannot build the rectangular pulse DD channel while not using rectanular pulse.");
+            end
+            % build H_DD
+            H_DD = zeros(self.sig_len, self.sig_len); % intialize the return channel
+            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum); % DFT matrix
+            idftmat = conj(dftmat); % IDFT matrix 
+            piMat = eye(self.sig_len); % permutation matrix (from the delay) -> pi
+            % accumulate all paths
+            for tap_id = 1:p
+                hi = his(tap_id);
+                li = lis(tap_id);
+                ki = kis(tap_id);
+                % delay
+                piMati = circshift(piMat, li); 
+                % Doppler
+                %deltaMat_diag = exp(2j*pi*ki/(self.sig_len)*[0:self.sig_len-1-li, -li:-1]);
+                deltaMat_diag = exp(2j*pi*ki/(self.sig_len)*[0:self.sig_len-1]);
+                deltaMati = diag(deltaMat_diag);
+                % Pi, Qi, & Ti
+                Pi = kron(dftmat, eye(self.nSubcarNum))*piMati; 
+                Qi = deltaMati*kron(idftmat, eye(self.nSubcarNum));
+                Ti = Pi*Qi;
+                H_DD = H_DD + hi*Ti;
             end
         end
 
