@@ -133,7 +133,7 @@ classdef OTFSResGrid < handle
             guard_delay_num_pos = inPar.Results.guard_delay_num_pos;
             guard_doppl_num_neg = inPar.Results.guard_doppl_num_neg;
             guard_doppl_num_pos = inPar.Results.guard_doppl_num_pos;
-
+            
             % insert pilots and guards
             self.insertPG(pilots_pow, guard_delay_full, guard_doppl_full, guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
             % insert data
@@ -491,15 +491,15 @@ classdef OTFSResGrid < handle
             % calulate channel estimate area
             if self.pilots_len > 0
                 if guard_delay_full
-                    self.ce_delay_beg = 1 + guard_doppl_num_neg;
+                    self.ce_delay_beg = 1;
                     self.ce_delay_end = self.nSubcarNum;
                 else
                     self.ce_delay_beg = self.pg_delay_beg + guard_delay_num_neg;
                     self.ce_delay_end = self.pg_delay_end;
                 end
                 if guard_doppl_full
-                    self.ce_doppl_beg = 1 + floor(guard_doppl_num_neg/2);
-                    self.ce_doppl_end = self.nTimeslotNum - floor(guard_doppl_num_pos/2);
+                    self.ce_doppl_beg = 1;
+                    self.ce_doppl_end = self.nTimeslotNum;
                 else
                     self.ce_doppl_beg = self.pg_doppl_beg + floor(guard_doppl_num_neg/2);
                     self.ce_doppl_end = self.pg_doppl_end - floor(guard_doppl_num_pos/2);
@@ -554,23 +554,24 @@ classdef OTFSResGrid < handle
                     error("The vector position is out of the OTFS size.");
                 end
             else
-                if pos_doppl <= 0 || pos_doppl > self.nSubcarNum
-                    error("The delay position is out of the subcarrier number.");
-                end
-                if varargin{1} <= 0 || varargin{1} > self.nTimeslotNum
+                if pos_doppl <= 0 || pos_doppl > self.nTimeslotNum
                     error("The Doppler position is out of the timeslot number.");
+                end
+                if varargin{1} <= 0 || varargin{1} > self.nSubcarNum
+                    error("The delay position is out of the subcarrier number.");
                 end
             end
             
             % recalculate the position
             if isempty(varargin)
+                pos_id = pos_doppl;
                 pos_doppl = pos_doppl/self.nSubcarNum;
                 if pos_doppl == floor(pos_doppl)
                     pos_doppl = floor(pos_doppl);
                 else
                     pos_doppl = floor(pos_doppl) + 1;
                 end
-                delay_pos = pos_doppl - (pos_doppl-1)*self.nSubcarNum;
+                delay_pos = pos_id - (pos_doppl-1)*self.nSubcarNum;
             else
                 delay_pos = varargin{1};
             end

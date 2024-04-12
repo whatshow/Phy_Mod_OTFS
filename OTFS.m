@@ -393,28 +393,34 @@ classdef OTFS < handle
         @data_only: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
         %}
         function H_DD = getChannel(self, varargin)
-            % label inputs
-            inPar = inputParser;
-            addParameter(inPar,"data_only", true, @(x) isscalar(x)&&islogical(x));
-            inPar.KeepUnmatched = true;
-            inPar.CaseSensitive = false;
-            parse(inPar, varargin{:});
-            data_only = inPar.Results.data_only;
             % input check & init
             p = self.taps_num;
             his = self.chan_coef;
             lis = self.delay_taps;
             kis = self.doppler_taps;
+            data_only = true;
             if ~isempty(varargin)
-                if length(varargin) >= 4
-                    p = length(varargin{1});
-                    his = varargin{2};
-                    lis = varargin{3};
-                    kis = varargin{4};
+                % load optional inputs
+                if length(varargin) >= 3
+                    his = varargin{1};
+                    lis = varargin{2};
+                    kis = varargin{3};
+                    p = length(his);
                     if p ~= length(lis) && p ~= length(kis)
                         error("The input CSI (gains, delays and dopplers) must have the same length.");
                     end
                 end
+                % load paired values
+                inPar = inputParser;
+                addParameter(inPar,"data_only", true, @(x) isscalar(x)&&islogical(x));
+                inPar.KeepUnmatched = true;
+                inPar.CaseSensitive = false;
+                if length(varargin) <= 2
+                    parse(inPar, varargin{:});
+                else
+                    parse(inPar, varargin{4:end});
+                end
+                data_only = inPar.Results.data_only;
             end
             % build the channel
             if self.pulse_type == self.PULSE_IDEAL
@@ -802,8 +808,8 @@ classdef OTFS < handle
             [ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end] = self.rg.getAreaCE();
             % mark redundant values - columns (PG area)
             if pg_num > 0
-                for doppl_id = pg_delay_beg:pg_delay_end
-                    for delay_id = pg_doppl_beg:pg_doppl_end
+                for doppl_id = pg_doppl_beg:pg_doppl_end
+                    for delay_id = pg_delay_beg:pg_delay_end
                         col_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(:, col_id) = invalud_col;
                     end
@@ -811,8 +817,8 @@ classdef OTFS < handle
             end
             % mark redundant values - rows (CE area)
             if ce_num > 0
-                for doppl_id = ce_delay_beg:ce_delay_end
-                    for delay_id = ce_doppl_beg:ce_doppl_end
+                for doppl_id = ce_doppl_beg:ce_doppl_end
+                    for delay_id = ce_delay_beg:ce_delay_end
                         row_id = (doppl_id-1)*self.nSubcarNum + delay_id;
                         H_DD(row_id, :) = invalud_row;
                     end
@@ -826,8 +832,7 @@ classdef OTFS < handle
             end
             % remove - rows
             if ce_num > 0
-                [~, H_DD_col_num] = size(H_DD);
-                row_idx = sum(isnan(H_DD), 2) == H_DD_col_num;
+                row_idx = sum(isnan(H_DD), 2) == (self.sig_len - pg_num);
                 H_DD(row_idx, :) = [];
             end
         end
