@@ -169,8 +169,8 @@ All codes are uniform in matlab and python as a class.
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
-    * `test_ce_case_00`: test illegal pilot allocation
-    * `test_ce_case_01`: test all pilots allocation for **center pilots and reduced guard** (integer Doppler & no noise)
+    * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
+    * `./MP`: examples showing how MP detects symbols using embedded pilots.
     * `test_ce_getcsi`: test `getCSI()` using `sort`
     * `test_ce_detect_*`: test channel estimation and detection together
     * `test_ch_*`: test the channel functions for `OTFS`
