@@ -20,35 +20,34 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel)
     for ite=1:n_ite
         % we update the mean and variance for each d in μ[d, c]
         %% Update mean and var
-        for ele1=1:M
-            for ele2=1:N
+        for l=1:M
+            for k=1:N
                 mean_int_hat = zeros(p,1);
                 var_int_hat = zeros(p,1);
                 for p_id=1:p
-                    m = ele1-1-lis(p_id)+1;
+                    m = l-1-lis(p_id)+1;
                     add_term = exp(1i*2*(pi/M)*(m-1)*(kis(p_id)/N));
                     add_term1 = 1;
-                    if ele1-1<lis(p_id)
-                        n = mod(ele2-1-kis(p_id),N) + 1;
+                    if l-1<lis(p_id)
+                        n = mod(k-1-kis(p_id),N) + 1;
                         add_term1 = exp(-1i*2*pi*((n-1)/N));
                     end
                     new_chan = add_term * (add_term1) * his(p_id);
 
                     for i2=1:1:M_mod
-                        mean_int_hat(p_id) = mean_int_hat(p_id) + p_map(N*(ele1-1)+ele2,p_id,i2) * constel(i2);
-                        var_int_hat(p_id) = var_int_hat(p_id) + p_map(N*(ele1-1)+ele2,p_id,i2) * abs(constel(i2))^2;
+                        mean_int_hat(p_id) = mean_int_hat(p_id) + p_map(N*(l-1)+k,p_id,i2) * constel(i2);
+                        var_int_hat(p_id) = var_int_hat(p_id) + p_map(N*(l-1)+k,p_id,i2) * abs(constel(i2))^2;
                     end
                     mean_int_hat(p_id) = mean_int_hat(p_id) * new_chan;
-                    var_int_hat(p_id) = var_int_hat(p_id) * abs(new_chan)^2;
-                    var_int_hat(p_id) = var_int_hat(p_id) - abs(mean_int_hat(p_id))^2;
+                    var_int_hat(p_id) = var_int_hat(p_id) * abs(new_chan)^2  - abs(mean_int_hat(p_id))^2;
                 end
 
                 mean_int_sum = sum(mean_int_hat);
                 var_int_sum = sum(var_int_hat)+(sigma_2);
 
                 for p_id=1:p
-                    mean_int(N*(ele1-1)+ele2,p_id) = mean_int_sum - mean_int_hat(p_id);
-                    var_int(N*(ele1-1)+ele2,p_id) = var_int_sum - var_int_hat(p_id);
+                    mean_int(N*(l-1)+k,p_id) = mean_int_sum - mean_int_hat(p_id);
+                    var_int(N*(l-1)+k,p_id) = var_int_sum - var_int_hat(p_id);
                 end
 
             end
