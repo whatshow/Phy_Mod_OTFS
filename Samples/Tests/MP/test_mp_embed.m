@@ -11,6 +11,7 @@ parfor i_fram = 1:10000
     data_temp = bi2de(reshape(data_info_bit,N_syms_perfram,M_bits));
     x = qammod(data_temp,M_mod,'gray');
     x = reshape(x,N,M);
+    x(2:6, 3:5)=0;
     % OTFS modulation
     s = OTFS_modulation(N,M,x);
     % OTFS channel generation
@@ -33,10 +34,10 @@ parfor i_fram = 1:10000
     y = OTFS_demodulation(N,M,r);
     
     %% detection
-    x_est = OTFS_mp_detector(N,M,M_mod,taps,delay_taps,Doppler_taps,chan_coef,sigma_2,y);
-    x_est2 = OTFS_MP(N,M, taps,chan_coef, delay_taps,Doppler_taps,sigma_2,y, conste);
-
-    x_est_diff = abs(x_est2 - x_est);
-    assert(sum(x_est_diff, "all") == 0);
+    x_est2 = OTFS_MP_Embed(N,M, taps,chan_coef, delay_taps,Doppler_taps,sigma_2,y, conste, 3, 5, 2, 6, 4, 5, 3, 5);
+    
+    errs = abs(x_est2 - x) > eps;
+    assert(sum(errs, "all") == 0);
 end
-disp("MP code is the same.");
+disp("MP Embedded is done.");
+

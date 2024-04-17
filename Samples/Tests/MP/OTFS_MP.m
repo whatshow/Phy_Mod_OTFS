@@ -1,4 +1,4 @@
-function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel, pg_l_beg, pg_l_end, pg_k_beg, pg_k_end, ce_l_beg, ce_l_end, ce_k_beg, ce_k_end)  
+function x_est = OTFS_MP(N,M,p,his,lis,kis,sigma_2,y,constel)  
     M_mod = length(constel);
     n_ite = 200;
     delta_fra = 0.6;
@@ -16,10 +16,7 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel, pg_l_beg, pg
         for l=1:M
             for k=1:N
                 d = N*(l-1)+k;
-                %TODO: jump if y[d] in CE
-                if l>=ce_l_beg && l<=ce_l_end && k>=ce_k_beg && k<=ce_k_end
-                    continue;
-                end
+                %TODO: jump if y[d] is in CE area
                 mu_d = zeros(p,1);                              % the sum of mu[d, c] for a given d (must be initialised as 0)
                 sigma2_d = zeros(p,1);                          % the sum of sigma2[d, c] for a given d (must be initialised as 0)
                 % we consider all x[e] -> y[d]
@@ -31,15 +28,11 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel, pg_l_beg, pg
                     e_l = l - 1 - li + 1;
                     e_k = mod(k - 1 - ki, N) + 1;
                     e_h = hi*exp(2j*(pi/M)*(e_l-1)*ki/N);
-                    if l-1 < li
+                    if l-1 < li 
                         e_l = e_l + M;
                         e_h = e_h*exp(-2j*pi*(e_k-1)/N);
                     end
-                    %TODO: jump if x[e] in PG
-                    if e_l>=pg_l_beg && e_l<=pg_l_end && e_k>=pg_k_beg && e_k <= pg_k_end
-                        continue;
-                    end
-
+                    %TODO: jump if x[e] is in PG area
                     % for the current x[c], we consider all constellation points
                     for i2=1:1:M_mod
                         mu_d(p_id) = mu_d(p_id) + p_dc(d,p_id,i2) * constel(i2);
@@ -63,10 +56,6 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel, pg_l_beg, pg
             for k=1:1:N
                 c = N*(l-1)+k;
                 %TODO: jump if x[c] in PG area
-                if l>=pg_l_beg && l<=pg_l_end && k>=pg_k_beg && k <= pg_k_end
-                    continue;
-                end
-
                 pr_ecj_ln = zeros(p, M_mod);                    % ln(Pr(y[e]|x[c]=aj, H))
                 % we consider all y[e] from x[c]
                 e_ls = zeros(p,1);                              % y[e] coordinate l
@@ -132,10 +121,6 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel, pg_l_beg, pg
     x_est = zeros(N,M);
     for l=1:1:M
         for k=1:1:N
-            %TODO: jump if x[c] in PG area
-            if l>=pg_l_beg && l<=pg_l_end && k>=pg_k_beg && k <= pg_k_end
-                continue;
-            end
             [~,pos] = max(sum_prob_fin(N*(l-1)+k,:));
             x_est(k,l) = constel(pos);
         end
