@@ -25,21 +25,22 @@ function x_est = OTFS_MP_Embed(N,M,p,his,lis,kis,sigma_2,y,constel)
                 mean_int_hat = zeros(p,1);
                 var_int_hat = zeros(p,1);
                 for p_id=1:p
-                    m = l-1-lis(p_id)+1;
-                    add_term = exp(1i*2*(pi/M)*(m-1)*(kis(p_id)/N));
-                    add_term1 = 1;
-                    if l-1<lis(p_id)
-                        n = mod(k-1-kis(p_id),N) + 1;
-                        add_term1 = exp(-1i*2*pi*((n-1)/N));
+                    hi = his(p_id);
+                    li = lis(p_id);
+                    ki = kis(p_id);
+                    c_l = l - 1 - li + 1;
+                    c_k = mod(k - 1 - ki, N) + 1;
+                    c_h = hi*exp(2j*(pi/M)*(c_l-1)*ki/N);
+                    if l-1 < li
+                        c_h = c_h*exp(-2j*pi*(c_k-1)/N);
                     end
-                    new_chan = add_term * (add_term1) * his(p_id);
 
                     for i2=1:1:M_mod
                         mean_int_hat(p_id) = mean_int_hat(p_id) + p_map(N*(l-1)+k,p_id,i2) * constel(i2);
                         var_int_hat(p_id) = var_int_hat(p_id) + p_map(N*(l-1)+k,p_id,i2) * abs(constel(i2))^2;
                     end
-                    mean_int_hat(p_id) = mean_int_hat(p_id) * new_chan;
-                    var_int_hat(p_id) = var_int_hat(p_id) * abs(new_chan)^2  - abs(mean_int_hat(p_id))^2;
+                    mean_int_hat(p_id) = mean_int_hat(p_id) * c_h;
+                    var_int_hat(p_id) = var_int_hat(p_id) * abs(c_h)^2  - abs(mean_int_hat(p_id))^2;
                 end
 
                 mean_int_sum = sum(mean_int_hat);
