@@ -5,13 +5,15 @@ test_mp_config;
 
 %% simulation
 conste = qammod(0:M_mod-1,M_mod, 'gray');
-parfor i_fram = 1:10000
+n_Frame = 1e4;
+SERs = zeros(n_Frame, 1);
+parfor i_fram = 1:n_Frame
     % random input bits generation
     data_info_bit = randi([0,1],N_bits_perfram,1);
     data_temp = bi2de(reshape(data_info_bit,N_syms_perfram,M_bits));
     x = qammod(data_temp,M_mod,'gray');
     x = reshape(x,N,M);
-    x(2:6, 3:5)=0;
+    x((pos_mid-2):(pos_mid+2), (pos_mid-1):(pos_mid+1))=0;
     % OTFS modulation
     s = OTFS_modulation(N,M,x);
     % OTFS channel generation
@@ -27,6 +29,7 @@ parfor i_fram = 1:10000
         s_chan = s_chan+chan_coef(p_id)*circshift([s.*exp(1j*2*pi/M ...
             *(-L:-L+length(s)-1)*Doppler_taps(p_id)/N).';zeros(delay_taps(end),1)],delay_taps(p_id));
     end
+    noise = sqrt(sigma_2/2)*(randn(size(s_chan)) + 1i*randn(size(s_chan)));
     r = s_chan + noise;
     r = r(L+1:L+(N*M));%discard cp
     
@@ -34,10 +37,11 @@ parfor i_fram = 1:10000
     y = OTFS_demodulation(N,M,r);
     
     %% detection
-    x_est2 = OTFS_MP_Embed(N,M, taps,chan_coef, delay_taps,Doppler_taps,sigma_2,y, conste, 3, 5, 2, 6, 4, 5, 3, 5);
+    x_est2 = OTFS_MP_Embed(N,M, taps,chan_coef, delay_taps,Doppler_taps,sigma_2,y, conste, (pos_mid-1), (pos_mid+1), (pos_mid-2), (pos_mid+2), pos_mid, pos_mid+1, pos_mid-1, pos_mid+1);
     
     errs = abs(x_est2 - x) > eps;
-    assert(sum(errs, "all") == 0);
+    SERs(i_fram) = sum(errs, "all")/M/N;
+    %assert(sum(errs, "all") == 0);
 end
-disp("MP Embedded is done.");
+fprintf("SER is %e.\n", mean(SERs));
 

@@ -4,7 +4,7 @@ clc;
 % OTFS parameters
 N = 7; % number of symbol
 M = 7; % number of subcarriers
-
+pos_mid = 4;
 
 M_mod = 4;
 M_bits = log2(M_mod);
