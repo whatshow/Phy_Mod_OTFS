@@ -35,74 +35,58 @@ Currently, we offer three options to install this tool.
         ```
 
 ## How to use
-All codes are uniform in matlab and python as a class.
-* This section illustrate the methods of the class following the process from Tx to Rx.
-    * OTFS()<br>
-        `@nSubcarNum`: the subcarrier number<br>
-        `@nTimeslotNum`: the timeslot number<br>
-        `@pilot_loc_type`: pilot location type<br>
-        `@batch_size`**(optional)** : the batch size **(only used in python)**.
-    
+All codes are uniform in matlab and python in three class.
+* OTFSResGrid: this class provides the resource grid
+    * OTFSResGrid()<br>
+        @in1: 1st input, a scalar for subcarrier number or the content directly<br>
+        @in2: only if 1st input is scalar, this input is the `nTimeslotNum`<br>
+        @zp_len: zero padding length
         ```c, matlab, python
-        nSubcarNum = 16;
-        nTimeslotNum = 7;
-        // initialise the class (base)
-        otfs = OTFS(nSubcarNum, nTimeslotNum);
-        otfs = OTFS(nSubcarNum, nTimeslotNum, batch_size=4); # using the batch (only used in python)
-        // initialise the class (base + channel estimation + symbol detection)
-        % matlab
-        otfs = OTFS(nSubcarNum, nTimeslotNum, "pilot_loc_type", OTFS.PILOT_LOC_CENTER);
-        # python
-        otfs = OTFS(nSubcarNum, nTimeslotNum, pilot_loc_type=OTFS.PILOT_LOC_CENTER);
+        // build a RG (give subcarrier number and timeslot number)
+        rg = OTFSResGrid(M, N, "zp_len", 0);
+        rg = OTFSResGrid(M, N, zp_len=0);
+        // build a RG (give X_DD matrix directly)
+        rg = OTFSResGrid(X_DD, "zp_len", 0);
+        rg = OTFSResGrid(X_DD, zp_len=0);
         ```
-    * insertPilotsAndGuards()<br>
+    * Set the location of pilots (in the center by default)
+        ```c, matlab, python
+        rg.pilot2center();  // pilots in the center of the entire OTFS frame
+        rg.pilot2zp();      // pilots in the center of zero-padding area
+        ```
+    * Set the pulse type
+        ```c, matlab, python
+        rg.setPulse2Ideal();    // use the ideal pulse
+        rg.setPulse2Recta();    // use the rectangular pulse
+        ```
+    * map(): `symbols` is mandatory, `pilots_pow` and `pilots_pow` must use one if you want to use pilots. Other parameters define the length of pilots and the guards area around the pilots. If the guard area is oversize, you are suggested to use full guard on that axis so that the channel estimation result will be more accurate.<br>
+        `@symbols`: OTFS symbols<br>
         `@pilots`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
         `@pilots_pow`: pilot power to generate random pilots<br>
         `@pilots_num_delay`: pilots number along the delay(Doppler) axis<br>
-        `@pilots_num_doppler`: pilots number along the Doppler(time) axis<br>
-        `guard_delay_full`: full guard on delay (if set true, ignore the number setting)<br>
+        `@pilots_num_doppl`: pilots number along the Doppler(time) axis<br>
+        `@guard_delay_full`: full guard on delay (if set true, ignore the number setting)<br>
         `@guard_delay_num_neg`: guard number negatively along the delay(frequency) axis<br>
         `@guard_delay_num_pos`: guard number positively along the delay(frequency) axis<br>
-        `@guard_doppler_full`: full guard on Doppler (if set true, ignore the number setting)<br>
-        `@guard_doppler_num_neg`: guard number negatively along the Doppler(time) axis<br>
-        `@guard_doppler_num_pos`: guard number positively along the Doppler(time) axis
+        `@guard_doppl_full`: full guard on Doppler (if set true, ignore the number setting)<br>
+        `@guard_doppl_num_neg`: guard number negatively along the Doppler(time) axis<br>
+        `@guard_doppl_num_pos`: guard number positively along the Doppler(time) axis
+    * demap()<br>
+        `@isData`: whether give the data (true by default)<br>
+        `@isCE`: whether give the channel estimation result(true by default)<br>
+        `@threshold`: the threshold to estimate the channel<br>
+        ```c, matlab, python
+        [y, his_est, lis_est, kis_est] = rg_rx.demap("threshold", 1e-10);
+        y, his_est, lis_est, kis_est = rg_rx.demap("threshold", 1e-10);
+        ```
+    * clone(): clone this resource grid
+    * isZP(): check whether use zero padding or not
+    * isPG(): check whether use pilots & guards
+    * isInAreaPG()
     
-        ```c, matlab, python
-        % matlab
-        otfs.insertPilotsAndGuards(2, 2, "pilots_pow", 1.2, "guard_delay_num_neg", 1, "guard_delay_num_pos", 1, "guard_doppler_num_neg", 2, "guard_doppler_num_pos", 2);
-        # python
-        otfs.insertPilotsAndGuards(2, 2, pilots_pow=1.2, guard_delay_num_neg=1, guard_delay_num_pos=1, guard_doppler_num_neg=2, guard_doppler_num_pos=2);
-        ```
+* OTFS: this class provides the entire process of OTFS from Tx to Rx
     * modulate()<br>
-        `@symbols`: a vector of `n` symbols as [(batch_size), n], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum] (the pilots & guards area must be empty)
-        ```c, matlab, python
-        otfs.modulate(x_origin);
-        ```
     * setChannel(): this methods has 2 kinds of inputs.<br>
-        * generate random channel<br>
-            If we use `batch`, the channel will be different for each sample in the batch.<br>
-            `@p`: the path number (scalar)<br>
-            `@lmax`: the maximal integer delay index (scalar)<br>
-            `@kmax`: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler
-            
-            ```c, matlab, python
-            % matlab
-            otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
-            # python
-            otfs.setChannel(p=6, lmax=11, kmax=3);
-            ```
-        * generate fixed channel<br>
-            `@gains:` the channel gains of [(batch_size), p]<br>
-            `@delays:` the channel delays of [(batch_size), p]<br>
-            `@dopplers`: the channel Doppler shift of [(batch_size), p]
-            
-            ```c, matlab, python
-            % matlab
-            otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
-            # python
-            otfs.setChannel(delays=[0, 1], dopplers=[2, 3], gains=[0.5, 0.5]);
-            otfs.setChannel(delays=np.tile([0, 1], (batch_size, 1)), dopplers=np.tile([2, 3], (batch_size, 1)), gains=np.tile([0.5, 0.5], (batch_size, 1))); # using batch
-            ```
     * passChannel()<br>
         `@No`: linear noise power (a scalar) or a given noise vector
         ```c, matlab, python
@@ -112,64 +96,13 @@ All codes are uniform in matlab and python as a class.
         ```c, matlab, python
         yDD = otfs.demodulate();
         ```
-    * estimateChannel(): estimate the channel state information based (the pilot type defines the detection method).<br>
-        `@threshold:` the threshold of detecting a path
-        * The algorithm for SISO single pilot is implemented from<br>
-            **III. EMBEDDED CHANNEL ESTIMATION FOR POINT-TO-POINT SISO CASE**<br>
-            **C. OTFS With Rectangular Waveforms**
-            > Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
-    * detect(): detect the symbols from received signal<br>
-        `@detect_type`: detect type<br>
-        `@csi_type`: detect CSI type<br>
-        `@No`: estimated noise power (linear)<br>
-        `@constellation`: the constellation (a vector)<br>
-        `@chan_coef`: the estimated channel gains<br>
-        `@delay_taps`: the estimated channel delays<br>
-        `@doppler_taps`: the estimated channel<br>
-        
-        ```c, matlab, python
-        // perfect CSI
-        otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_PERFECT, No, sympool);
-        // estimated CSI
-        otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_CE, No, sympool);
-        // input CSI
-        % matlab
-        otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_IN, No, sympool, "chan_coef", chan_coef, "delay_taps", delay_taps, "doppler_taps", doppler_taps);
-        # python
-        otfs.detect(OTFS.DETECT_MP_BASE, OTFS.DETECT_CSI_IN, No, sympool, chan_coef=chan_coef, delay_taps=delay_taps, doppler_taps=doppler_taps);
-        ```
-* This section illustrate support methods to expose attributes
-    * addChannelPath(): add a path to the channel (this does not influence other existing paths)<br>
-        `@hi`: the path gain (linear gain)<br>
-        `@li`: the delay<br>
-        `@ki`: the Doppler shift<br>
-    * getChannel(): return the Delay-Doppler domain channel matrix of [(batch_size), n, n]<br>
-        `@chan_coef`: the channel gains<br>
-        `@delay_taps`: the channel delays<br>
-        `@doppler_taps`: the channel Dopplers<br>
-        `@only_for_data`: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
-        
-        ```c, matlab, python
-        H_DD = otfs.getChannel();
-        H_DD = otfs.getChannel("chan_coef", chan_coef, "delay_taps", delay_taps, "doppler_taps", doppler_taps, "only_for_data", false); % matlab
-        H_DD = otfs.getChannel(chan_coef=chan_coef, delay_taps=delay_taps, doppler_taps=doppler_taps, only_for_data=False); # python
-        ```
-    * getCSI(): get the channel state information, return [gains, delays, dopplers]<br>
-        `@sort_by_gain`: sort axis<br>
-        `@sort_by_delay_doppler`: sort axes<br>
-        `@sort_by_doppler_delay`: sort axes<br>
-        `@sort_ascend`: sort direction<br>
-        `@sort_descend`: sort direction
-    * getX2DT(): get Tx signal in the Delay Time domain [(batch_size), delay, time]<br>
-    * getX2TF(): get Tx signal in the TF domain [(batch_size), nSubcarNum, nTimeslotNum]<br>
-    * getX2T(): get Tx signal in the time domain<br>
-        `@fft_size`: the size of FFT
-    * getYDD(): get Rx received signal in delay Doppler domain<br>
+* OTFSDetect: this class provides dedicated OTFS detectors
 
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
     * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
+    * `./CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
     * `./MP`: examples showing how MP detects symbols using embedded pilots.
     * `test_ce_getcsi`: test `getCSI()` using `sort`
     * `test_ce_detect_*`: test channel estimation and detection together

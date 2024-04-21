@@ -3,11 +3,11 @@ classdef OTFSResGrid < handle
     properties(Constant)
         % pulse
         PULSE_NO = 0;
-        PULSE_IDEAL = 10;                         % using ideal pulse to estimate the channel
-        PULSE_RECTA = 20;                         % using rectangular waveform to estimate the channel
+        PULSE_IDEAL = 10;                           % using ideal pulse to estimate the channel
+        PULSE_RECTA = 20;                           % using rectangular waveform to estimate the channel
         % Pilot locations
-        PILOT_LOC_CENTER = 10;                    % the pilot is put at the center of frame
-        PILOT_LOC_ZP = 20;                        % the pilot is put at the zero padding area
+        PILOT_LOC_CENTER = 10;                      % the pilot is put at the center of frame
+        PILOT_LOC_ZP = 20;                          % the pilot is put at the zero padding area
     end
     properties
         nSubcarNum {mustBeInteger}                  % subcarrier number
@@ -44,7 +44,7 @@ classdef OTFSResGrid < handle
     methods
         %{
         init the resource grid
-        @in1:               1st input, a scalar for `nSubcarNum` or the content directly
+        @in1:               1st input, a scalar for subcarrier number or the content directly
         @in2:               only if 1st input is scalar, this input is the `nTimeslotNum`
         @zp_len:            zero padding length
         %}
@@ -90,6 +90,16 @@ classdef OTFSResGrid < handle
         end
         function pilot2zp(self)
             self.pilot_loc_type = self.PILOT_LOC_ZP;
+        end
+
+        %{
+        pulse settings
+        %}
+        function setPulse2Ideal(self)
+            self.pulse_type = self.PULSE_IDEAL;
+        end
+        function setPulse2Recta(self)
+            self.pulse_type = self.PULSE_RECTA;
         end
 
         %{
@@ -141,29 +151,25 @@ classdef OTFSResGrid < handle
         end
 
         %{
-        pulse settings
-        %}
-        function setPulse2Ideal(self)
-            self.pulse_type = self.PULSE_IDEAL;
-        end
-        function setPulse2Recta(self)
-            self.pulse_type = self.PULSE_RECTA;
-        end
-
-        %{
         demap
+        @isData:        whether give the data
+        @isCE:          whether give the channel estimation result
         @threshold:     the threshold to estimate the channel
         %}
         function [y, his, lis, kis] = demap(self, varargin)
             % optional inputs - register
             inPar = inputParser;
+            addParameter(inPar, 'isData', true, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar, 'isCE', true, @(x) isscalar(x)&&islogical(x));
             addParameter(inPar, 'threshold', 0, @(x) isscalar(x)&&isnumeric(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
             inPar.CaseSensitive = false;    % Allow capital or small characters
             parse(inPar, varargin{:});
             % optional inputs - assign
+            isData = inPar.Results.isData;
+            isCE = inPar.Results.isCE;
             threshold = inPar.Results.threshold;
-            % input check
+            % input check          
             % input check - threshold
             if threshold < 0
                 error("The threshould must be non-negative.");
@@ -174,13 +180,16 @@ classdef OTFSResGrid < handle
             end
 
             % y
-            y = self.getContentNoCE();
+            y = NaN;
+            if isData
+                y = self.getContentNoCE();
+            end
             % Hest
             his = NaN;
             lis = NaN;
             kis = NaN;
-            % have pilots, estimate the channel
-            if self.isPG()
+            % need to estimate the channel & have pilots
+            if isCE && self.isPG()
                 if self.pilots_len == 1
                     [his, lis, kis] = self.estimateChannel4SingPilot(threshold);
                 end
@@ -225,7 +234,7 @@ classdef OTFSResGrid < handle
         end
 
         %{
-        check whether the pilots & guards are inserted or not, return pilot
+        check whether use pilots & guards
         %}
         function is_pg = isPG(self)
             % check whether pilots is assigned or not
