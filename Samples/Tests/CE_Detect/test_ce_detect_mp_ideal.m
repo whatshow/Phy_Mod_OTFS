@@ -20,7 +20,7 @@ SNR_ds = 4:2:20;                     % Data SNR (dB)
 Nos = 10.^(-SNR_ds/10);               % noise power
 pil_pows = 10.^((SNR_p - SNR_ds)/10);
 %pil_pow = Nos.*10.^(SNR_p/10);
-pil_thrs = 3*sqrt(Nos+1);             % pilot threshold
+pil_thrs = 3*sqrt(Nos);             % pilot threshold
 % OTFS configuration
 N = 12;                             % time slot number
 M = 90;                             % subcarrier number
@@ -80,7 +80,11 @@ for SNR_d_id = 1:length(SNR_ds)
         xDD_est_percsi  = od.detect(rg_rx, his, lis, kis, No);
         xDD_est_ce      = od.detect(rg_rx, his_est, lis_est, kis_est, No);
         tmp_SERs_PerCSI(i_Fram) = sum(abs(xDD_est_percsi - xDD) > eps)/N_syms_perfram;
-        tmpSERs_CE(i_Fram) = sum(abs(xDD_est_ce - xDD) > eps)/N_syms_perfram;
+        if empty(his_est)
+            tmpSERs_CE(i_Fram) = 1;
+        else
+            tmpSERs_CE(i_Fram) = sum(abs(xDD_est_ce - xDD) > eps)/N_syms_perfram;
+        end
     end
     % update the average SER
     SERs_PerCSI(SNR_d_id) = mean(tmp_SERs_PerCSI);
