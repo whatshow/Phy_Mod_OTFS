@@ -80,7 +80,7 @@ for SNR_d_id = 1:length(SNR_ds)
         xDD_est_percsi  = od.detect(rg_rx, his, lis, kis, No);
         xDD_est_ce      = od.detect(rg_rx, his_est, lis_est, kis_est, No);
         tmp_SERs_PerCSI(i_Fram) = sum(abs(xDD_est_percsi - xDD) > eps)/N_syms_perfram;
-        if empty(his_est)
+        if isempty(his_est)
             tmpSERs_CE(i_Fram) = 1;
         else
             tmpSERs_CE(i_Fram) = sum(abs(xDD_est_ce - xDD) > eps)/N_syms_perfram;
