@@ -40,14 +40,9 @@ All codes are uniform in matlab and python in three class.
     * OTFSResGrid()<br>
         @in1: 1st input, a scalar for subcarrier number or the content directly<br>
         @in2: only if 1st input is scalar, this input is the `nTimeslotNum`<br>
-        @zp_len: zero padding length
         ```c, matlab, python
-        // build a RG (give subcarrier number and timeslot number)
-        rg = OTFSResGrid(M, N, "zp_len", 0);
-        rg = OTFSResGrid(M, N, zp_len=0);
-        // build a RG (give X_DD matrix directly)
-        rg = OTFSResGrid(X_DD, "zp_len", 0);
-        rg = OTFSResGrid(X_DD, zp_len=0);
+        rg = OTFSResGrid(M, N);     // build a RG (give subcarrier number and timeslot number)
+        rg = OTFSResGrid(X_DD);     // build a RG (give X_DD matrix directly)
         ```
     * Set the location of pilots (in the center by default)
         ```c, matlab, python

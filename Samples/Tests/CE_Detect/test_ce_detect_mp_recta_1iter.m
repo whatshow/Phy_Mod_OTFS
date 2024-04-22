@@ -7,7 +7,7 @@ SNR_d = 18; % dB
 No = 1;
 pil_pow = 10^(SNR_p/10);
 sig_pow = 10^(SNR_d/10);
-pil_thr = 3*sqrt(No+sig_pow);
+pil_thr = 3*sqrt(No);
 % OTFS configuration
 N = 64;                          % time slot number
 M = 16;                          % subcarrier number

@@ -92,8 +92,12 @@ for SNR_d_id = 1:length(SNR_ds)
     % save
     save(path_file);
 end
+% remove 0s
+SERs_PerCSI = max(SERs_PerCSI, eps);
+SERs_CE = max(SERs_CE, eps);
 % save
 save(path_file);
+
 
 %% plot
 semilogy(SNR_ds, SERs_CE, "-s", "Color", "#D95319", "LineWidth", 4);
@@ -103,6 +107,6 @@ hold off;
 grid on;
 xlabel("SNR(dB)");
 ylabel("SER");
-ylim([min(SERs_alva), 1]);
-xlim([min(SNR_range), max(SNR_range)]);
+ylim([min(SERs_PerCSI), max(SERs_CE)]);
+xlim([min(SNR_ds), max(SNR_ds)]);
 legend('PerCSI-MP', 'CE-MP');
