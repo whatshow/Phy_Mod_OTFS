@@ -9,7 +9,7 @@ This repository is a fundamental toolbox of OTFS modulation crossing `matlab` an
 Currently, we offer three options to install this tool.
 * Install through `Matlab Add-Ons`
     * Install through Matlab `Get Add-Ons`: search `whatshow_phy_mod_otfs` and install it.
-    * Install through `.mltbx`: Go to [releases](https://github.com/whatshow/Phy_Mod_OTFS/releases) to download the file `whatshow_phy_mod_otfs.mltbx` in the latest release to install.
+    * Install through `.mltbx`: Go to ***Releases*** to download the file `whatshow_phy_mod_otfs.mltbx` in the latest release to install.
 * Install through `pip`
     ```sh
     pip install whatshow-phy-mod-otfs
