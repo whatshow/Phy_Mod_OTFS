@@ -95,10 +95,10 @@ All codes are uniform in matlab and python in three class.
 
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
+* `MP_Embed`: examples showing how MP detects symbols using embedded pilots.
 * `Tests`
     * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
     * `./CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
-    * `./MP`: examples showing how MP detects symbols using embedded pilots.
     * `test_ce_getcsi`: test `getCSI()` using `sort`
     * `test_ce_detect_*`: test channel estimation and detection together
     * `test_ch_*`: test the channel functions for `OTFS`

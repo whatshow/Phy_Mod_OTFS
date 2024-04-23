@@ -39,4 +39,6 @@ xDD_syms = sqrt(sig_pow/2)*qammod(nbits, M_mod,'InputType','bit','UnitAveragePow
 
 %% RG
 rg = OTFSResGrid(nSubcarNum, nTimeslotNum);
-rg.map(xDD_syms, "pilots_num_delay", pilots_num_delay, "pilots_num_doppl", pilots_num_doppl, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppl_num_neg", guard_doppl_num_neg, "guard_doppl_num_pos", guard_doppl_num_pos);
+rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
+rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
+rg.map(xDD_syms, "pilots_pow", pil_pow);

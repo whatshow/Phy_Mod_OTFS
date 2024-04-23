@@ -174,7 +174,7 @@ classdef OTFSDetector < handle
                 for l=1:self.M
                     for k=1:self.N
                         d = self.N*(l-1)+k;
-                        %TODO: jump if y[d] in CE
+                        % jump if y[d] in CE
                         if ce_num>0 && l>=ce_l_beg && l<=ce_l_end && k>=ce_k_beg && k<=ce_k_end
                             continue;
                         end
@@ -199,7 +199,7 @@ classdef OTFSDetector < handle
                                     e_h = e_h*exp(-2j*pi*(e_k-1)/self.N);
                                 end
                             end
-                            %TODO: jump if x[e] in PG
+                            % jump if x[e] in PG
                             if pg_num>0 && e_l>=pg_l_beg && e_l<=pg_l_end && e_k>=pg_k_beg && e_k <= pg_k_end
                                 continue;
                             end
@@ -225,7 +225,7 @@ classdef OTFSDetector < handle
                 for l=1:1:self.M
                     for k=1:1:self.N
                         c = self.N*(l-1)+k;
-                        %TODO: jump if x[c] in PG area
+                        % jump if x[c] in PG area
                         if pg_num>0 && l>=pg_l_beg && l<=pg_l_end && k>=pg_k_beg && k <= pg_k_end
                             continue;
                         end
@@ -302,7 +302,7 @@ classdef OTFSDetector < handle
             sym_id = 1;
             for k=1:1:self.N
                 for l=1:1:self.M
-                    %TODO: jump if in PG area
+                    % jump if in PG area
                     if pg_num>0 && l>=pg_l_beg && l<=pg_l_end && k>=pg_k_beg && k <= pg_k_end
                         continue;
                     end

@@ -352,10 +352,16 @@ classdef OTFSResGrid < handle
         @pos_delay:     the position on the delay axis for matrix or th position on the Doppler-delay axis for the vector
         %}
         function is_in = isInAreaPG(self, pos_doppl, varargin)
-            is_in = self.isInArea(1, pos_doppl, varargin{:});
+            is_in = self.isInArea(10, pos_doppl, varargin{:});
+        end
+        function is_in = isInAreaZP(self, pos_doppl, varargin)
+            is_in = self.isInArea(11, pos_doppl, varargin{:});
+        end
+        function is_in = isInAreaDA(self, pos_doppl, varargin)
+            is_in = self.isInArea(12, pos_doppl, varargin{:});
         end
         function is_in = isInAreaCE(self, pos_doppl, varargin)
-            is_in = self.isInArea(2, pos_doppl, varargin{:});
+            is_in = self.isInArea(20, pos_doppl, varargin{:});
         end
 
         %{
@@ -527,6 +533,94 @@ classdef OTFSResGrid < handle
         end
 
         %{
+        calculate PG & CE area
+        %}
+        function calcAreaPGCE(self)
+            % overflow check
+            if self.pl1 - self.gl_len_neg <= 0
+                error("The guard (neg) on delay axis overflows.");
+            end
+            if (self.pl1+self.pl_len-1) + self.gl_len_pos > self.nSubcarNum
+                error("The guard (pos) on delay axis overflows.");
+            end
+            if self.pk1 - self.gk_len_neg <= 0
+                error("The guard (neg) on Doppler axis overflows.");
+            end
+            if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
+                error("The guard (pos) on Doppler axis overflows.");
+            end
+            % calculate area
+            if self.pl_len > 0 && self.pk_len > 0
+                % calculate PG area
+                if self.pilot_type == self.PILOT_TYPE_EM
+                    % PG area only exist when using embedded pilots
+                    self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
+                    self.pg_delay_beg = self.pl1 - self.gl_len_neg;
+                    self.pg_delay_end = self.pl1 + self.pl_len - 1 + self.gl_len_pos;
+                    self.pg_doppl_beg = self.pk1 - self.gk_len_neg;
+                    self.pg_doppl_end = self.pk1 + self.pk_len - 1 + self.gk_len_pos;
+                end
+                
+                % calulate channel estimate area
+                if self.gl_len_ful
+                    self.ce_delay_beg = 1;
+                    self.ce_delay_end = self.nSubcarNum;
+                else
+                    self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
+                    self.ce_delay_end = self.pg_delay_end;
+                end
+                if self.gk_len_ful
+                    self.ce_doppl_beg = 1;
+                    self.ce_doppl_end = self.nTimeslotNum;
+                else
+                    self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
+                    self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
+                end
+                self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
+            end
+        end
+        
+        %{
+        insert data
+        @symbols: symbols to map a vector
+        %}
+        function insertDA(self, symbols)
+            % input check
+            if self.pilot_type == self.PILOT_TYPE_SP
+                data_num = self.nTimeslotNum*self.nSubcarNum - self.zp_len*self.nTimeslotNum;
+            else
+                data_num = self.nTimeslotNum*self.nSubcarNum - self.pg_num - self.zp_len*self.nTimeslotNum;
+            end
+            % input check - symbols
+            if ~isvector(symbols)
+                error("The transmission symbol must be a vector");
+            elseif length(symbols) ~= data_num
+                error("The transmission symbol number must be %d", data_num);
+            end
+            
+            % modulate
+            % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
+            %TODO: fill data when using zero padding
+            symbols = symbols(:);
+            if data_num == self.nSubcarNum*self.nTimeslotNum
+                self.content = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
+            elseif data_num == self.nSubcarNum*self.nTimeslotNum - self.zp_len*self.nTimeslotNum
+                self.content = [transpose(reshape(symbols, (self.nSubcarNum - self.zp_len), self.nTimeslotNum)); zeros(self.zp_len, self.nTimeslotNum)];
+            else
+                symbols_id = 1;
+                for doppl_id = 1:self.nTimeslotNum
+                    for delay_id = 1:self.nSubcarNum
+                        if self.isInAreaDA(doppl_id, delay_id)
+                            self.content(doppl_id, delay_id) = symbols(symbols_id);
+                            symbols_id = symbols_id + 1;
+                        end
+                    end
+                end
+                assert(symbols_id - 1 == data_num);
+            end
+        end
+
+        %{
         insert pilots
         @pilots_pow: pilot power
         %}
@@ -553,90 +647,13 @@ classdef OTFSResGrid < handle
             % allocate pilots
             if self.p_len ~= 0
                 % allocate pilots
-                self.content(self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1) = transpose(reshape(self.pilots, self.pl_len, self.pk_len));
-            end
-        end
-
-        %{
-        calculate PG & CE area
-        %}
-        function calcAreaPGCE(self)
-            % overflow check
-            if self.pl1 - self.gl_len_neg <= 0
-                error("The guard (neg) on delay axis overflows.");
-            end
-            if (self.pl1+self.pl_len-1) + self.gl_len_pos > self.nSubcarNum
-                error("The guard (pos) on delay axis overflows.");
-            end
-            if self.pk1 - self.gk_len_neg <= 0
-                error("The guard (neg) on Doppler axis overflows.");
-            end
-            if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
-                error("The guard (pos) on Doppler axis overflows.");
-            end
-            % calculate area
-            if self.pl_len > 0 && self.pk_len > 0
-                % calculate PG area
-                self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
-                self.pg_delay_beg = self.pl1 - self.gl_len_neg;
-                self.pg_delay_end = self.pl1 + self.pl_len - 1 + self.gl_len_pos;
-                self.pg_doppl_beg = self.pk1 - self.gk_len_neg;
-                self.pg_doppl_end = self.pk1 + self.pk_len - 1 + self.gk_len_pos;
-                % calulate channel estimate area
-                if self.gl_len_ful
-                    self.ce_delay_beg = 1;
-                    self.ce_delay_end = self.nSubcarNum;
-                else
-                    self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
-                    self.ce_delay_end = self.pg_delay_end;
-                end
-                if self.gk_len_ful
-                    self.ce_doppl_beg = 1;
-                    self.ce_doppl_end = self.nTimeslotNum;
-                else
-                    self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
-                    self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
-                end
-                self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
-            end
-        end
-        
-        %{
-        insert data
-        @symbols: symbols to map a vector
-        %}
-        function insertDA(self, symbols)
-            % input check
-            data_num = self.nTimeslotNum*self.nSubcarNum - self.pg_num - self.zp_len*self.nTimeslotNum;
-            % input check - symbols
-            if ~isvector(symbols)
-                error("The transmission symbol must be a vector");
-            elseif length(symbols) ~= data_num
-                error("The transmission symbol number must be %d", data_num);
-            end
-            
-            % modulate
-            % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
-            symbols = symbols(:);
-            if data_num == self.nSubcarNum*self.nTimeslotNum
-                self.content = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
-            else
-                symbols_id = 1;
-                for doppl_id = 1:self.nTimeslotNum
-                    for delay_id = 1:self.nSubcarNum
-                        if ~self.isInAreaPG(doppl_id, delay_id)
-                            self.content(doppl_id, delay_id) = symbols(symbols_id);
-                            symbols_id = symbols_id + 1;
-                        end
-                    end
-                end
-                assert(symbols_id - 1 == data_num);
+                self.content(self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1) = self.content(self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1) + transpose(reshape(self.pilots, self.pl_len, self.pk_len));
             end
         end
 
         %{
         decide whether the current location is in CE area
-        @tag:           1->PG, 2->CE
+        @tag:           10->PG, 11->ZP, 12->Data, 20->CE
         @pos_doppl:     the position on the Doppler axis.
         @pos_delay:     the delay position. Not given means the position is for a Doppler-delay vector
         %}
@@ -669,9 +686,20 @@ classdef OTFSResGrid < handle
                 delay_pos = varargin{1};
             end
             % decide
-            if tag == 1
+            if tag == 10
                 is_in = delay_pos >= self.pg_delay_beg && delay_pos <= self.pg_delay_end && pos_doppl >= self.pg_doppl_beg && pos_doppl <= self.pg_doppl_end;
-            elseif tag == 2
+            elseif tag == 11
+                is_in = self.zp_len > 0 && delay_pos > self.nSubcarNum - self.zp_len;
+            elseif tag == 12
+                if self.pg_num == 0
+                    is_in = true;
+                else
+                    is_in = delay_pos < self.pg_delay_beg || delay_pos > self.pg_delay_end || pos_doppl < self.pg_doppl_beg || pos_doppl > self.pg_doppl_end;
+                end
+                if self.zp_len > 0 
+                    is_in = is_in && delay_pos <= self.nSubcarNum - self.zp_len;
+                end
+            elseif tag == 20
                 is_in = delay_pos >= self.ce_delay_beg && delay_pos <= self.ce_delay_end && pos_doppl >= self.ce_doppl_beg && pos_doppl <= self.ce_doppl_end;
             end
         end
