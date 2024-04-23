@@ -41,10 +41,7 @@ sympool = qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);
 N_syms_perfram = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*N;
 N_bits_perfram = N_syms_perfram*M_bits;
 % Monte Carlo
-N_Frams = 3e4*ones(length(SNR_ds), 1);
-N_Frams(end-4:end-3)=1e5;
-N_Frams(end-2)=5e5;
-N_Frams(end-1:end)=1e6;
+N_Frams = 1e6*ones(length(SNR_ds), 1);
 
 %% simulations
 SERs_PerCSI = zeros(length(SNR_ds), 1);
