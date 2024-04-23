@@ -242,14 +242,14 @@ All codes are uniform in matlab and python in three class.
             od.useMPBase(n_ite=10, delta_fra=0.9);
             ```
     * detect(): return the estimated symbols<br>
-        `@y`: the received signal from the resource grid (after demapping) or just a resource grid 
-        `@csi_info1`: (1) a vector of path gains  (2) a matrix of HDD
-        `@csi_info2`: (1) the delay indices       (2) the noise power
-        `@csi_info3`: (1) the Doppler indices
+        `@y`: the received signal from the resource grid (after demapping) or just a resource grid <br>
+        `@csi_info1`: (1) a vector of path gains  (2) a matrix of HDD<br>
+        `@csi_info2`: (1) the delay indices       (2) the noise power<br>
+        `@csi_info3`: (1) the Doppler indices<br>
         `@csi_info4`: (1) the noise power
         ```c, matlab, python
         xDD_est  = od.detect(rg_rx, his, lis, kis, No);
-        ```c, matlab, python
+        ```
     
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
