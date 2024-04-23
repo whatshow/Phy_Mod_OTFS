@@ -249,6 +249,7 @@ All codes are uniform in matlab and python in three class.
         `@csi_info4`: (1) the noise power
         ```c, matlab, python
         xDD_est  = od.detect(rg_rx, his, lis, kis, No);
+        xDD_est  = od.detect(rg_rx, Hdd, No);
         ```
     
 ## Samples
