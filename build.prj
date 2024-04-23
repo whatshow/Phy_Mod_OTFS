@@ -49,11 +49,14 @@ yDD = otfs.demodulate();</param.description>
 __pycache__/
 _dist/
 _tmp/
+_data/
+Img/
 Samples/
 
 %% files
 .gitignore
 init.m
+*.asv
 
 %% files - python
 *.py</param.exclude.filters>
@@ -129,6 +132,8 @@ init.m
     <fileset.rootfiles>
       <file>${PROJECT_ROOT}\LICENSE</file>
       <file>${PROJECT_ROOT}\OTFS.m</file>
+      <file>${PROJECT_ROOT}\OTFSDetector.m</file>
+      <file>${PROJECT_ROOT}\OTFSResGrid.m</file>
       <file>${PROJECT_ROOT}\README.md</file>
     </fileset.rootfiles>
     <fileset.depfun.included />

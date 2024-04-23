@@ -57,9 +57,17 @@ classdef OTFSResGrid < handle
         init the resource grid
         @in1:               1st input, a scalar for subcarrier number or the content directly
         @in2:               only if 1st input is scalar, this input is the `nTimeslotNum`
+        @zp_len:            zero padding length
         %}
         function self = OTFSResGrid(in1, varargin)
+            % register optional inputs
+            inPar = inputParser;
+            addParameter(inPar, "zp_len", self.zp_len, @(x) isscalar(x)&&isnumeric(x));
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            % take inputs
             % take inputs - nSubcarNum, nTimeslotNum, content & varargin_id_beg
+            varargin_id_beg = 1;
             if isscalar(in1)
                 if length(varargin) < 1
                     error("The timeslot number is not given.")
@@ -71,10 +79,17 @@ classdef OTFSResGrid < handle
                     self.nSubcarNum = in1;
                     self.nTimeslotNum = varargin{1};
                     self.content = zeros(self.nTimeslotNum, self.nSubcarNum);
+                    varargin_id_beg = 2;
                 end
             else
                 self.content = in1;
                 [self.nTimeslotNum, self.nSubcarNum] = size(self.content);
+            end
+            % take inputs - optional
+            parse(inPar, varargin{varargin_id_beg:end});
+            self.zp_len = inPar.Results.zp_len;
+            if self.zp_len < 0 || self.zp_len > self.nSubcarNum
+                error("Zero Padding length cannot be negative or over subcarrier number.");
             end
         end
         
@@ -102,9 +117,8 @@ classdef OTFSResGrid < handle
         pilot position setting
         @pl_len:    pilot length on the delay
         @pk_len:    pilot length on the doppler
-        @zp_len:    zero padding length
-        @pl:        pilot location on the delay
-        @pk:        pilot location on the doppler
+        @pl1:       pilot location on the delay
+        @pk1:       pilot location on the doppler
         %}
         function setPilot2Center(self, pl_len, pk_len)
             self.pilot_loc_type = self.PILOT_LOC_CENTER;
@@ -114,11 +128,13 @@ classdef OTFSResGrid < handle
             self.pk1 = floor((self.nTimeslotNum - self.pk_len)/2) + 1;
             self.validP();
         end
-        function setPilot2ZP(self, pl_len, pk_len, zp_len)
+        function setPilot2ZP(self, pl_len, pk_len)
+            if self.zp_len == 0
+                error("Zero Padding is not used in this resource grid.");
+            end
             self.pilot_loc_type = self.PILOT_LOC_ZP;
             self.pl_len = pl_len;
             self.pk_len = pk_len;
-            self.zp_len = zp_len;
             self.pl1 = floor((self.nSubcarNum - self.pl_len)/2);
             self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2);
             self.validP();
@@ -398,6 +414,7 @@ classdef OTFSResGrid < handle
         
         %{
         set content
+        @content: a 2D matrix containing pilots, guards and data (if used)
         %}
         function setContent(self, content)
             self.content = content;
@@ -434,7 +451,7 @@ classdef OTFSResGrid < handle
         end
 
         %{
-        get content - CE
+        get content - CE (return a matrix)
         %}
         function ce_area = getContentCE(self)
             if self.ce_num == 0
@@ -526,10 +543,6 @@ classdef OTFSResGrid < handle
                     error("Pilot length on the Doppler axis overflows.");
                 end
             end
-            % zero padding
-            if self.zp_len < 0 || self.zp_len > self.nSubcarNum
-                error("Zero Padding length cannot be negative or over subcarrier number.");
-            end
         end
 
         %{
@@ -600,7 +613,6 @@ classdef OTFSResGrid < handle
             
             % modulate
             % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
-            %TODO: fill data when using zero padding
             symbols = symbols(:);
             if data_num == self.nSubcarNum*self.nTimeslotNum
                 self.content = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));

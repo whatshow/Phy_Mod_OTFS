@@ -538,6 +538,7 @@ classdef OTFS < handle
         @H_DD: the DD channel from
         %}
         function H_DD = removeNoDAChannel(self, H_DD)
+            %TODO: remove zero padding area
             invalud_row = NaN(1, self.sig_len);
             invalud_col = NaN(self.sig_len, 1);
             [pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end] = self.rg.getAreaPG();

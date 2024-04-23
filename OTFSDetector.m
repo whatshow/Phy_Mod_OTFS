@@ -33,7 +33,6 @@ classdef OTFSDetector < handle
         %{
         constructor
         @constel:           the constellation (a vector)
-        @
         %}
         function self = OTFSDetector(constel)
             % constel
