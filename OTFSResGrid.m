@@ -5,6 +5,9 @@ classdef OTFSResGrid < handle
         PULSE_NO = 0;
         PULSE_IDEAL = 10;                           % using ideal pulse to estimate the channel
         PULSE_RECTA = 20;                           % using rectangular waveform to estimate the channel
+        % pilot types
+        PILOT_TYPE_EM = 10;                         % embedded pilots
+        PILOT_TYPE_SP = 20;                         % superimposed pilots
         % Pilot locations
         PILOT_LOC_FLEX = 0;                         % flexible location
         PILOT_LOC_CENTER = 10;                      % the pilot is put at the center of frame
@@ -19,6 +22,7 @@ classdef OTFSResGrid < handle
         % pulse
         pulse_type = OTFSResGrid.PULSE_NO;
         % pilot
+        pilot_type = OTFSResGrid.PILOT_TYPE_EM;
         pilots = [];
         p_len = 0;
         pl1 = 0;                                            % 1st (lowest) pilot location in delay axis
@@ -85,6 +89,16 @@ classdef OTFSResGrid < handle
         end
 
         %{
+        pilot type setting
+        %}
+        function setPilot2Embed(self)
+            self.pilot_type = self.PILOT_TYPE_EM;
+        end
+        function setPilot2SuperImposed(self)
+            self.pilot_type = self.PILOT_TYPE_SP;
+        end
+
+        %{
         pilot position setting
         @pl_len:    pilot length on the delay
         @pk_len:    pilot length on the doppler
@@ -134,7 +148,7 @@ classdef OTFSResGrid < handle
                 error("The input is not enough.");
             end
             ins = [0,0,0,0];                 % guard lengths on 4 directions
-            arg_opt_id_beg = 1;              % optional arguments beginning id
+            arg_opt_id_beg = args_len + 1;   % optional arguments beginning id
             for arg_id = 1:args_len
                 if isnumeric(varargin{arg_id})
                     ins(arg_id) = varargin{arg_id};
@@ -201,13 +215,11 @@ classdef OTFSResGrid < handle
             self.pilots         = inPar.Results.pilots;
             pilots_pow          = inPar.Results.pilots_pow;
             
-            % validate pilot settings
             self.validP();
-            % insert pilots and guards
-            self.insertP(pilots_pow);
             self.calcAreaPGCE();
-            % insert data
+            % insert
             self.insertDA(symbols);
+            self.insertP(pilots_pow);
         end
 
         %{
@@ -563,7 +575,7 @@ classdef OTFSResGrid < handle
                 error("The guard (pos) on Doppler axis overflows.");
             end
             % calculate area
-            if self.p_len > 0
+            if self.pl_len > 0 && self.pk_len > 0
                 % calculate PG area
                 self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
                 self.pg_delay_beg = self.pl1 - self.gl_len_neg;

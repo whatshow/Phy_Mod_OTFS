@@ -22,7 +22,7 @@ for set_id = 1:length(Ms)
     % build rg
     rg = OTFSResGrid(M, N);
     rg.setPulse2Recta();
-    rg.pilot2Center(pilots_num_delay, pilots_num_doppl);
+    rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
     rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
     rg.map(xDD, "pilots_pow", pil_pow);
     rgs{set_id} = rg;

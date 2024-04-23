@@ -25,7 +25,7 @@ pil_thrs = 3*sqrt(Nos);             % pilot threshold
 N = 12;                             % time slot number
 M = 90;                             % subcarrier number
 % channel
-p = 4;
+p = 18;
 lmax = 3;
 kmax = 6;
 % pilot settings
