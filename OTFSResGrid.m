@@ -120,51 +120,67 @@ classdef OTFSResGrid < handle
 
         %{
         set guards
-        @gl_len_neg:        negative guard on the delay
-        @gl_len_pos:        positive guard on the delay
-        @gk_len_neg:        negative guard on the Doppler
-        @gk_len_pos:        positive guard on the Doppler
+        @in1:               negative guard on the delay
+        @in2:               positive guard on the delay
+        @in3:               negative guard on the Doppler
+        @in4:               positive guard on the Doppler
         @guard_delay_full:  full guard on delay (if set true, ignore the number setting)
         @guard_doppl_full:  full guard on Doppler (if set true, ignore the number setting)
         %}
-        function setGuard(self, gl_len_neg, gl_len_pos, gk_len_neg, gk_len_pos, varargin)
+        function setGuard(self, varargin)
             % take inputs
+            args_len = length(varargin);
+            if args_len < 4
+                error("The input is not enough.");
+            end
+            ins = [0,0,0,0];                 % guard lengths on 4 directions
+            arg_opt_id_beg = 1;              % optional arguments beginning id
+            for arg_id = 1:args_len
+                if isnumeric(varargin{arg_id})
+                    ins(arg_id) = varargin{arg_id};
+                else
+                    arg_opt_id_beg = arg_id;
+                    break;
+                end
+            end
+
+            % take optional inputs
             inPar = inputParser;
             addParameter(inPar, 'guard_delay_full', false, @(x) isscalar(x)&&islogical(x));
             addParameter(inPar, 'guard_doppl_full', false, @(x) isscalar(x)&&islogical(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
             inPar.CaseSensitive = false;    % Allow capital or small characters
-            parse(inPar, varargin{:});
+            parse(inPar, varargin{arg_opt_id_beg:end});
             self.gl_len_ful = inPar.Results.guard_delay_full;
             self.gk_len_ful = inPar.Results.guard_doppl_full;
             % input check - full guard
             if self.gl_len_ful
-                gl_len_neg = floor((self.nSubcarNum - self.pl_len)/2);
-                gl_len_pos = self.nSubcarNum - self.pl_len - gl_len_neg;               
+                ins(1) = floor((self.nSubcarNum - self.pl_len)/2);
+                ins(2) = self.nSubcarNum - self.pl_len - ins(1);               
             end
             if self.gk_len_ful
-                gk_len_neg = floor((self.nTimeslotNum - self.pk_len)/2);
-                gk_len_pos = self.nTimeslotNum - self.pk_len - gk_len_neg;
+                ins(3) = floor((self.nTimeslotNum - self.pk_len)/2);
+                ins(4) = self.nTimeslotNum - self.pk_len - ins(3);
             end
             % input check - guard - integers only
-            if floor(gl_len_neg) ~= gl_len_neg || floor(gl_len_pos) ~= gl_len_pos
+            if floor(ins(1)) ~= ins(1) || floor(ins(2)) ~= ins(2)
                 error("Guard number along the delay axis must be integers.");
             end
-            if floor(gk_len_neg) ~= gk_len_neg || floor(gk_len_pos) ~= gk_len_pos
+            if floor(ins(3)) ~= ins(3) || floor(ins(4)) ~= ins(4)
                 error("Guard number along the Doppler axis must be integers.");
             end
             % input check - guard - no negative
-            if gl_len_neg < 0 || gl_len_pos < 0
+            if ins(1) < 0 || ins(2) < 0
                 error("Guard number along the delay axis must be non-negative.");
             end
-            if gk_len_neg < 0 || gk_len_pos < 0
+            if ins(3) < 0 || ins(4) < 0
                 error("Guard number along the Doppler axis must be non-negative.");
             end           
             % take inputs
-            self.gl_len_neg = gl_len_neg;
-            self.gl_len_pos = gl_len_pos;
-            self.gk_len_neg = gk_len_neg;
-            self.gk_len_pos = gk_len_pos;
+            self.gl_len_neg = ins(1);
+            self.gl_len_pos = ins(2);
+            self.gk_len_neg = ins(3);
+            self.gk_len_pos = ins(4);
         end
 
         %{

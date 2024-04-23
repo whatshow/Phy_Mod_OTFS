@@ -27,7 +27,7 @@ M_mod = 16;
 M_bits = log2(M_mod);
 sympool = sqrt(sig_pow)*qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);
 % OTFS frame
-N_syms_perfram = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(pilots_num_doppl+guard_doppl_num_neg+guard_doppl_num_pos);
+N_syms_perfram = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*N;
 N_bits_perfram = N_syms_perfram*M_bits;
 
 
@@ -37,7 +37,7 @@ data_temp = randi([0 1], N_bits_perfram, 1);
 xDD = sqrt(sig_pow)*qammod(data_temp,M_mod,'InputType','bit','UnitAveragePower', true);
 rg = OTFSResGrid(M, N);
 rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
-rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
+rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, 'guard_doppl_full', true);
 rg.map(xDD, "pilots_pow", pil_pow);
 %rg.setPulse2Recta();
 rg.setPulse2Ideal();

@@ -64,7 +64,7 @@ for SNR_d_id = 1:length(SNR_ds)
         xDD = qammod(data_temp, M_mod, 'InputType', 'bit', 'UnitAveragePower', true);
         rg = OTFSResGrid(M, N);
         rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
-        rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos, "guard_doppl_full", true);
+        rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, "guard_doppl_full", true);
         rg.setPulse2Ideal();
         rg.map(xDD, "pilots_pow", pil_pow);
         % through the channel
