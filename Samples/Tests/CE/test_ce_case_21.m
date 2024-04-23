@@ -19,9 +19,11 @@ for set_id = 1:length(Ms)
     xDD = qammod(nbits, M_mod,'InputType','bit','UnitAveragePower',true);
     % build rg
     rg = OTFSResGrid(M, N);
-    rgs{set_id} = rg;
-    rg.map(xDD, "pilots_num_delay", pilots_num_delay, "pilots_num_doppl", pilots_num_doppl, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppl_num_neg", guard_doppl_num_neg, "guard_doppl_num_pos", guard_doppl_num_pos);
     rg.setPulse2Ideal();
+    rg.pilot2Center(pilots_num_delay, pilots_num_doppl);
+    rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
+    rg.map(xDD, "pilots_pow", pil_pow);
+    rgs{set_id} = rg;
     % through the channel
     otfs = OTFS();
     otfs.modulate(rg);

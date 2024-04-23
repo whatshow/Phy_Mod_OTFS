@@ -36,7 +36,9 @@ N_bits_perfram = N_syms_perfram*M_bits;
 data_temp = randi([0 1], N_bits_perfram, 1);
 xDD = sqrt(sig_pow)*qammod(data_temp,M_mod,'InputType','bit','UnitAveragePower', true);
 rg = OTFSResGrid(M, N);
-rg.map(xDD, "pilots_num_delay", pilots_num_delay, "pilots_num_doppl", pilots_num_doppl, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppl_num_neg", guard_doppl_num_neg, "guard_doppl_num_pos", guard_doppl_num_pos);
+rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
+rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
+rg.map(xDD, "pilots_pow", pil_pow);
 %rg.setPulse2Recta();
 rg.setPulse2Ideal();
 % through the channel

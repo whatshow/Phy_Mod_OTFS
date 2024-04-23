@@ -63,8 +63,10 @@ for SNR_d_id = 1:length(SNR_ds)
         data_temp = randi([0 1], N_bits_perfram, 1);
         xDD = qammod(data_temp, M_mod, 'InputType', 'bit', 'UnitAveragePower', true);
         rg = OTFSResGrid(M, N);
+        rg.setPilot2Center(pilots_num_delay, pilots_num_doppl);
+        rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos, "guard_doppl_full", true);
         rg.setPulse2Ideal();
-        rg.map(xDD, "pilots_num_delay", pilots_num_delay, "pilots_num_doppl", pilots_num_doppl, "pilots_pow", pil_pow, "guard_delay_num_neg", guard_delay_num_neg, "guard_delay_num_pos", guard_delay_num_pos, "guard_doppl_full", true);
+        rg.map(xDD, "pilots_pow", pil_pow);
         % through the channel
         otfs = OTFS();
         otfs.modulate(rg);

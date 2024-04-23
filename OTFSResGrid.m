@@ -20,13 +20,19 @@ classdef OTFSResGrid < handle
         pulse_type = OTFSResGrid.PULSE_NO;
         % pilot
         pilots = [];
-        pilots_len = 0;
-        pilots_num_delay = 0;                       % pilots number along the delay(Doppler) axis
-        pilots_num_doppl = 0;                       % pilots number along the Doppler(time) axis
-        pilot_loc_delay_1st = 0;                    % 1st (lowest) pilot location in delay axis
-        pilot_loc_doppl_1st = 0;                    % 1st (lowest) pilot location in Doppler axis
-        % pilot attribute
-        pilot_loc_type = OTFSResGrid.PILOT_LOC_CENTER;
+        p_len = 0;
+        pl1 = 0;                                            % 1st (lowest) pilot location in delay axis
+        pk1 = 0;                                            % 1st (lowest) pilot location in Doppler axis
+        pl_len = 0;                                         % pilots number along the delay(Doppler) axis
+        pk_len = 0;                                         % pilots number along the Doppler(time) axis
+        pilot_loc_type = OTFSResGrid.PILOT_LOC_CENTER;      % pilot attribute
+        % guard
+        gl_len_ful = false;
+        gl_len_neg = 0;
+        gl_len_pos = 0;
+        gk_len_ful = false;
+        gk_len_neg = 0;
+        gk_len_pos = 0;
         % channel estimation area in content
         pg_num = 0;
         pg_delay_beg = NaN;
@@ -80,24 +86,85 @@ classdef OTFSResGrid < handle
 
         %{
         pilot position setting
-        @zp_len: zero padding length
-        @pl:    pilot location on the delay
-        @pk:    pilot location on the doppler
+        @pl_len:    pilot length on the delay
+        @pk_len:    pilot length on the doppler
+        @zp_len:    zero padding length
+        @pl:        pilot location on the delay
+        @pk:        pilot location on the doppler
         %}
-        function pilot2Center(self)
+        function setPilot2Center(self, pl_len, pk_len)
             self.pilot_loc_type = self.PILOT_LOC_CENTER;
+            self.pl_len = pl_len;
+            self.pk_len = pk_len;
+            self.pl1 = floor((self.nSubcarNum - self.pl_len)/2) + 1;
+            self.pk1 = floor((self.nTimeslotNum - self.pk_len)/2) + 1;
+            self.validP();
         end
-        function pilot2ZP(self, zp_len)
+        function setPilot2ZP(self, pl_len, pk_len, zp_len)
             self.pilot_loc_type = self.PILOT_LOC_ZP;
+            self.pl_len = pl_len;
+            self.pk_len = pk_len;
             self.zp_len = zp_len;
-            if self.zp_len < 0 || self.zp_len > self.nSubcarNum
-                error("Zero Padding length cannot be negative or over subcarrier number.");
-            end
+            self.pl1 = floor((self.nSubcarNum - self.pl_len)/2);
+            self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2);
+            self.validP();
         end
-        function pilot2Flex(self, pl, pk)
+        function setPilot2Flex(self, pl_len, pk_len, pl1, pk1)
             self.pilot_loc_type = self.PILOT_LOC_FLEX;
-            self.pilot_loc_delay_1st = pl;
-            self.pilot_loc_doppl_1st = pk;
+            self.pl_len = pl_len;
+            self.pk_len = pk_len;
+            self.pl1 = pl1;
+            self.pk1 = pk1;
+            self.validP();
+        end
+
+        %{
+        set guards
+        @gl_len_neg:        negative guard on the delay
+        @gl_len_pos:        positive guard on the delay
+        @gk_len_neg:        negative guard on the Doppler
+        @gk_len_pos:        positive guard on the Doppler
+        @guard_delay_full:  full guard on delay (if set true, ignore the number setting)
+        @guard_doppl_full:  full guard on Doppler (if set true, ignore the number setting)
+        %}
+        function setGuard(self, gl_len_neg, gl_len_pos, gk_len_neg, gk_len_pos, varargin)
+            % take inputs
+            inPar = inputParser;
+            addParameter(inPar, 'guard_delay_full', false, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar, 'guard_doppl_full', false, @(x) isscalar(x)&&islogical(x));
+            inPar.KeepUnmatched = true;     % Allow unmatched cases
+            inPar.CaseSensitive = false;    % Allow capital or small characters
+            parse(inPar, varargin{:});
+            self.gl_len_ful = inPar.Results.guard_delay_full;
+            self.gk_len_ful = inPar.Results.guard_doppl_full;
+            % input check - full guard
+            if self.gl_len_ful
+                gl_len_neg = floor((self.nSubcarNum - self.pl_len)/2);
+                gl_len_pos = self.nSubcarNum - self.pl_len - gl_len_neg;               
+            end
+            if self.gk_len_ful
+                gk_len_neg = floor((self.nTimeslotNum - self.pk_len)/2);
+                gk_len_pos = self.nTimeslotNum - self.pk_len - gk_len_neg;
+            end
+            % input check - guard - integers only
+            if floor(gl_len_neg) ~= gl_len_neg || floor(gl_len_pos) ~= gl_len_pos
+                error("Guard number along the delay axis must be integers.");
+            end
+            if floor(gk_len_neg) ~= gk_len_neg || floor(gk_len_pos) ~= gk_len_pos
+                error("Guard number along the Doppler axis must be integers.");
+            end
+            % input check - guard - no negative
+            if gl_len_neg < 0 || gl_len_pos < 0
+                error("Guard number along the delay axis must be non-negative.");
+            end
+            if gk_len_neg < 0 || gk_len_pos < 0
+                error("Guard number along the Doppler axis must be non-negative.");
+            end           
+            % take inputs
+            self.gl_len_neg = gl_len_neg;
+            self.gl_len_pos = gl_len_pos;
+            self.gk_len_neg = gk_len_neg;
+            self.gk_len_pos = gk_len_pos;
         end
 
         %{
@@ -105,46 +172,24 @@ classdef OTFSResGrid < handle
         @symbols:                   OTFS symbols
         @pilots:                    a vector of your pilots (if given `pilots_pow` won't be used)
         @pilots_pow:                pilot power to generate random pilots
-        @pilots_num_delay:          pilots number along the delay(Doppler) axis
-        @pilots_num_doppl:          pilots number along the Doppler(time) axis
-        @guard_delay_full:          full guard on delay (if set true, ignore the number setting)
-        @guard_delay_num_neg:       guard number negatively along the delay(frequency) axis
-        @guard_delay_num_pos:       guard number positively along the delay(frequency) axis
-        @guard_doppl_full:          full guard on Doppler (if set true, ignore the number setting)
-        @guard_doppl_num_neg:       guard number negatively along the Doppler(time) axis
-        @guard_doppl_num_pos:       guard number positively along the Doppler(time) axis
         %}
         function map(self, symbols, varargin)
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar, 'pilots', self.pilots, @(x) isvector(x)&&isnumeric(x));
             addParameter(inPar, 'pilots_pow', NaN, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'pilots_num_delay', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'pilots_num_doppl', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_delay_full', false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar, 'guard_doppl_full', false, @(x) isscalar(x)&&islogical(x));
-            addParameter(inPar, 'guard_delay_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_delay_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_doppl_num_neg', 0, @(x) isscalar(x)&&isnumeric(x));
-            addParameter(inPar, 'guard_doppl_num_pos', 0, @(x) isscalar(x)&&isnumeric(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
             inPar.CaseSensitive = false;    % Allow capital or small characters
             parse(inPar, varargin{:});
             % optional inputs - assign
-            self.pilots              = inPar.Results.pilots;
-            self.pilots_num_delay    = inPar.Results.pilots_num_delay;
-            self.pilots_num_doppl    = inPar.Results.pilots_num_doppl;
+            self.pilots         = inPar.Results.pilots;
             pilots_pow          = inPar.Results.pilots_pow;
-            guard_delay_full    = inPar.Results.guard_delay_full;
-            guard_doppl_full    = inPar.Results.guard_doppl_full;
-            guard_delay_num_neg = inPar.Results.guard_delay_num_neg;
-            guard_delay_num_pos = inPar.Results.guard_delay_num_pos;
-            guard_doppl_num_neg = inPar.Results.guard_doppl_num_neg;
-            guard_doppl_num_pos = inPar.Results.guard_doppl_num_pos;
             
+            % validate pilot settings
+            self.validP();
             % insert pilots and guards
             self.insertP(pilots_pow);
-            self.insertG(guard_delay_full, guard_doppl_full, guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
+            self.calcAreaPGCE();
             % insert data
             self.insertDA(symbols);
         end
@@ -218,7 +263,7 @@ classdef OTFSResGrid < handle
             kis = NaN;
             % need to estimate the channel & have pilots
             if isCE && self.isPG()
-                if self.pilots_len == 1
+                if self.p_len == 1
                     [his, lis, kis] = self.estimateChannel4SingPilot(threshold);
                 end
             end
@@ -236,11 +281,11 @@ classdef OTFSResGrid < handle
             rg.zp_len = self.zp_len;
             rg.pulse_type = self.pulse_type;
             rg.pilots = self.pilots;
-            rg.pilots_len = self.pilots_len;
-            rg.pilots_num_delay = self.pilots_num_delay;
-            rg.pilots_num_doppl = self.pilots_num_doppl;
-            rg.pilot_loc_delay_1st = self.pilot_loc_delay_1st;
-            rg.pilot_loc_doppl_1st = self.pilot_loc_doppl_1st;
+            rg.p_len = self.p_len;
+            rg.pl_len = self.pl_len;
+            rg.pk_len = self.pk_len;
+            rg.pl1 = self.pl1;
+            rg.pk1 = self.pk1;
             rg.pilot_loc_type = self.pilot_loc_type;
             rg.pg_num = self.pg_num;
             rg.pg_delay_beg = self.pg_delay_beg;
@@ -429,113 +474,100 @@ classdef OTFSResGrid < handle
     % private methods
     methods(Access=private)
         %{
+        validate pilot settings
+        %}
+        function validP(self)
+            % 1st pilot coordinates & % pilot length
+            if self.pk_len > 0 && self.pl_len > 0
+                if self.pk1 < 1 || self.pk1 > self.nTimeslotNum
+                    error("Pilot 1st location on the delay axis overflows.");
+                end
+                if self.pl1 < 1 || self.pl1 > self.nSubcarNum
+                    error("Pilot 1st location on the Doppler axis overflows.");
+                end
+                if self.pk1 + self.pk_len - 1 > self.nTimeslotNum
+                    error("Pilot length on the delay axis overflows.");
+                end
+                if self.pl1 + self.pl_len - 1 > self.nSubcarNum
+                    error("Pilot length on the Doppler axis overflows.");
+                end
+            end
+            % zero padding
+            if self.zp_len < 0 || self.zp_len > self.nSubcarNum
+                error("Zero Padding length cannot be negative or over subcarrier number.");
+            end
+        end
+
+        %{
         insert pilots
         @pilots_pow: pilot power
         %}
         function insertP(self, pilots_pow)
             % input check
-            self.pilots_len = length(self.pilots);
-            % input check - pilot numbers
-            if self.pilots_num_delay < 0 || self.pilots_num_doppl < 0
-                error("Pilot number on each axis must be non-negative.");
-            end
+            self.p_len = length(self.pilots);
             % input check - pilots
             if ~isempty(self.pilots)
-                if self.pilots_len ~= self.pilots_num_delay*self.pilots_num_doppl
+                if self.p_len ~= self.pl_len*self.pk_len
                     error("The manual pilot input do not have the required number.");
-                elseif self.pilots_len > self.nTimeslotNum*self.nSubcarNum
+                elseif self.p_len > self.nTimeslotNum*self.nSubcarNum
                     error("The manual pilot input overflows (over the OTFS frame size).");
                 end
             end
             % input check - pilot power
-            if self.pilots_len == 0 && isnan(pilots_pow)
+            if self.p_len == 0 && isnan(pilots_pow)
                 error("The pilots (linear) power is required while no manual pilot input.");
             end
             % initiate pilots if empty
             if isempty(self.pilots)
-                self.pilots_len = self.pilots_num_delay*self.pilots_num_doppl;
-                self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(self.pilots_len, 1);
+                self.p_len = self.pl_len*self.pk_len;
+                self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(self.p_len, 1);
             end
             % allocate pilots
-            if self.pilots_len ~= 0
-                % allocate the coordinate for 1st pilot
-                switch self.pilot_loc_type
-                    case self.PILOT_LOC_CENTER
-                        self.pilot_loc_delay_1st = floor((self.nSubcarNum - self.pilots_num_delay)/2) + 1;
-                        self.pilot_loc_doppl_1st = floor((self.nTimeslotNum - self.pilots_num_doppl)/2) + 1;
-                    case self.PILOT_LOC_ZP 
-                        self.pilot_loc_delay_1st = floor((self.nSubcarNum - self.pilots_num_delay)/2);
-                        self.pilot_loc_doppl_1st = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pilots_num_doppl)/2);
-                end
+            if self.p_len ~= 0
                 % allocate pilots
-                self.content(self.pilot_loc_doppl_1st:self.pilot_loc_doppl_1st+self.pilots_num_doppl-1, self.pilot_loc_delay_1st:self.pilot_loc_delay_1st+self.pilots_num_delay-1) = transpose(reshape(self.pilots, self.pilots_num_delay, self.pilots_num_doppl));
+                self.content(self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1) = transpose(reshape(self.pilots, self.pl_len, self.pk_len));
             end
         end
 
         %{
-        insert guards
+        calculate PG & CE area
         %}
-        function insertG(self, guard_delay_full, guard_doppl_full, guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos)
-            % input check - full guard
-            if guard_delay_full
-                % overwrite guard settings
-                guard_delay_num_neg = floor((self.nSubcarNum - self.pilots_num_delay)/2);
-                guard_delay_num_pos = self.nSubcarNum - self.pilots_num_delay - guard_delay_num_neg;
-            else
-                if guard_delay_num_neg < 0 || guard_delay_num_pos < 0
-                    error("Guard number along the delay axis must be non-negative.");
-                end
-                if floor(guard_delay_num_neg) ~= guard_delay_num_neg || floor(guard_delay_num_pos) ~= guard_delay_num_pos
-                    error("Guard number along the delay/Doppler axis must be integers.");
-                end
-            end
-            if guard_doppl_full
-                guard_doppl_num_neg = floor((self.nTimeslotNum - self.pilots_num_doppl)/2);
-                guard_doppl_num_pos = self.nTimeslotNum - self.pilots_num_doppl - guard_doppl_num_neg;
-            else
-                if guard_doppl_num_neg < 0 || guard_doppl_num_pos < 0
-                    error("Guard number along the Doppler axis must be non-negative.");
-                end
-                if floor(guard_doppl_num_neg) ~= guard_doppl_num_neg || floor(guard_doppl_num_pos) ~= guard_doppl_num_pos
-                    error("Guard number along the Doppler axis must be integers.");
-                end
-            end
-            % input check - overflow (guards)
-            if self.pilot_loc_delay_1st - guard_delay_num_neg <= 0
+        function calcAreaPGCE(self)
+            % overflow check
+            if self.pl1 - self.gl_len_neg <= 0
                 error("The guard (neg) on delay axis overflows.");
             end
-            if (self.pilot_loc_delay_1st+self.pilots_num_delay-1) + guard_delay_num_pos > self.nSubcarNum
+            if (self.pl1+self.pl_len-1) + self.gl_len_pos > self.nSubcarNum
                 error("The guard (pos) on delay axis overflows.");
             end
-            if self.pilot_loc_doppl_1st - guard_doppl_num_neg <= 0
+            if self.pk1 - self.gk_len_neg <= 0
                 error("The guard (neg) on Doppler axis overflows.");
             end
-            if (self.pilot_loc_doppl_1st+self.pilots_num_doppl-1) + guard_doppl_num_pos > self.nTimeslotNum
+            if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
                 error("The guard (pos) on Doppler axis overflows.");
             end
-            
             % calculate area
-            if self.pilots_len > 0
+            if self.p_len > 0
                 % calculate PG area
-                self.pg_num = (self.pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*(self.pilots_num_doppl+guard_doppl_num_neg+guard_doppl_num_pos);
-                self.pg_delay_beg = self.pilot_loc_delay_1st - guard_delay_num_neg;
-                self.pg_delay_end = self.pilot_loc_delay_1st + self.pilots_num_delay - 1 + guard_delay_num_pos;
-                self.pg_doppl_beg = self.pilot_loc_doppl_1st - guard_doppl_num_neg;
-                self.pg_doppl_end = self.pilot_loc_doppl_1st + self.pilots_num_doppl - 1 + guard_doppl_num_pos;
+                self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
+                self.pg_delay_beg = self.pl1 - self.gl_len_neg;
+                self.pg_delay_end = self.pl1 + self.pl_len - 1 + self.gl_len_pos;
+                self.pg_doppl_beg = self.pk1 - self.gk_len_neg;
+                self.pg_doppl_end = self.pk1 + self.pk_len - 1 + self.gk_len_pos;
                 % calulate channel estimate area
-                if guard_delay_full
+                if self.gl_len_ful
                     self.ce_delay_beg = 1;
                     self.ce_delay_end = self.nSubcarNum;
                 else
-                    self.ce_delay_beg = self.pg_delay_beg + guard_delay_num_neg;
+                    self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
                     self.ce_delay_end = self.pg_delay_end;
                 end
-                if guard_doppl_full
+                if self.gk_len_ful
                     self.ce_doppl_beg = 1;
                     self.ce_doppl_end = self.nTimeslotNum;
                 else
-                    self.ce_doppl_beg = self.pg_doppl_beg + floor(guard_doppl_num_neg/2);
-                    self.ce_doppl_end = self.pg_doppl_end - floor(guard_doppl_num_pos/2);
+                    self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
+                    self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
                 end
                 self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
             end
@@ -622,7 +654,7 @@ classdef OTFSResGrid < handle
         %}
         function [his, lis, kis] = estimateChannel4SingPilot(self, threshold)
             % input check
-            if self.pilots_len ~= 1
+            if self.p_len ~= 1
                 error("There should be only 1 pilot.");
             end
             
@@ -634,12 +666,12 @@ classdef OTFSResGrid < handle
                 for doppl_id = self.ce_doppl_beg:self.ce_doppl_end
                     pss_y = self.content(doppl_id, delay_id);
                     if abs(pss_y) > threshold
-                        li = delay_id - self.pilot_loc_delay_1st;
-                        ki = doppl_id - self.pilot_loc_doppl_1st;
+                        li = delay_id - self.pl1;
+                        ki = doppl_id - self.pk1;
                         if self.pulse_type == self.PULSE_IDEAL
                             pss_beta = exp(-2j*pi*li*ki/self.nSubcarNum/self.nTimeslotNum);
                         elseif self.pulse_type == self.PULSE_RECTA
-                            pss_beta = exp(2j*pi*(self.pilot_loc_delay_1st - 1)*ki/self.nSubcarNum/self.nTimeslotNum);
+                            pss_beta = exp(2j*pi*(self.pl1 - 1)*ki/self.nSubcarNum/self.nTimeslotNum);
                         end
                         hi = pss_y/self.pilots/pss_beta;
                         his(end+1) = hi;
