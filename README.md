@@ -36,7 +36,7 @@ Currently, we offer three options to install this tool.
 
 ## How to use
 All codes are uniform in matlab and python in three class.
-![system_model](/Img/system_model.jpg)
+![system_model](https://github.com/whatshow/Phy_Mod_OTFS/blob/main/Img/system_model.jpg)
 * OTFSResGrid: this class provides the resource grid
     * OTFSResGrid()<br>
         `@in1`: 1st input, a scalar for subcarrier number or the content directly<br>
