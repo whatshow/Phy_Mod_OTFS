@@ -56,7 +56,7 @@ classdef OTFSResGrid < handle
         %{
         init the resource grid
         @in1:               1st input, a scalar for subcarrier number or the content directly
-        @in2:               only if 1st input is scalar, this input is the `nTimeslotNum`
+        @in2:               only if 1st input is scalar, this input is the timeslot number
         @zp_len:            zero padding length
         %}
         function self = OTFSResGrid(in1, varargin)
