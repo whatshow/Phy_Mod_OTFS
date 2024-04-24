@@ -8,7 +8,7 @@ This repository is a fundamental toolbox of OTFS modulation crossing `matlab` an
 ## Preinstall
 This repositiory requires you to install other repositiories to support. Please click the tags below to check how to install them.
 
-[![toolbox](https://img.shields.io/badge/toolbox-1.0.1-white)](https://github.com/whatshow/Toolbox)
+[![Toolbox](https://img.shields.io/badge/Toolbox-1.0.1-white)](https://github.com/whatshow/Toolbox)
 
 ## How to install
 * Install through `Matlab Add-Ons`
