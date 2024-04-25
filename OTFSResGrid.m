@@ -503,7 +503,7 @@ classdef OTFSResGrid < handle
         %{
         get content - zero PG area (return a vector)
         %}
-        function data = getContentZeroPG(self, varargin)
+        function data = getContentZeroPG(self)
             % get data
             data = self.content;
             % zero the CE area
