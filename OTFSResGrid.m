@@ -627,9 +627,7 @@ classdef OTFSResGrid < handle
                 error("The transmission symbol number must be %d", data_num);
             end
             
-            % modulate
-            % reshape(rowwise) to [Doppler, delay] or [nTimeslotNum ,nSubcarNum]
-            symbols = symbols(:);
+            % insert
             if data_num == self.nSubcarNum*self.nTimeslotNum
                 self.content = transpose(reshape(symbols, self.nSubcarNum, self.nTimeslotNum));
             elseif data_num == self.nSubcarNum*self.nTimeslotNum - self.zp_len*self.nTimeslotNum
