@@ -70,16 +70,21 @@ classdef OTFSResGrid < handle
             varargin_id_beg = 1;
             if isscalar(in1)
                 if length(varargin) < 1
-                    error("The timeslot number is not given.")
-                elseif floor(in1) ~= in1
-                    error("The subcarier number can only be an integer.");
-                elseif floor(varargin{1}) ~= varargin{1}
-                    error("The timeslot number can only be an integer.");
+                    error("The timeslot number is not given.");
                 else
-                    self.nSubcarNum = in1;
-                    self.nTimeslotNum = varargin{1};
-                    self.content = zeros(self.nTimeslotNum, self.nSubcarNum);
-                    varargin_id_beg = 2;
+                    in2 = varargin{1};
+                    if ~isscalar(in2)
+                        error("The timeslot number is illegal.");
+                    elseif floor(in1) ~= in1
+                        error("The subcarier number can only be an integer.");
+                    elseif floor(varargin{1}) ~= varargin{1}
+                        error("The timeslot number can only be an integer.");
+                    else
+                        self.nSubcarNum = in1;
+                        self.nTimeslotNum = in2;
+                        self.content = zeros(self.nTimeslotNum, self.nSubcarNum);
+                        varargin_id_beg = 2;
+                    end
                 end
             else
                 self.content = in1;
@@ -135,8 +140,8 @@ classdef OTFSResGrid < handle
             self.pilot_loc_type = self.PILOT_LOC_ZP;
             self.pl_len = pl_len;
             self.pk_len = pk_len;
-            self.pl1 = floor((self.nSubcarNum - self.pl_len)/2);
-            self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2);
+            self.pl1 = floor((self.nSubcarNum - self.pl_len)/2) + 1;
+            self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2) + 1;
             self.validP();
         end
         function setPilot2Flex(self, pl_len, pk_len, pl1, pk1)
@@ -158,6 +163,10 @@ classdef OTFSResGrid < handle
         @guard_doppl_full:  full guard on Doppler (if set true, ignore the number setting)
         %}
         function setGuard(self, varargin)
+            % pilot check
+            if self.pk_len <= 0 || self.pl_len <= 0
+                error("Pilots must be set before setting guards.");
+            end
             % take inputs
             args_len = length(varargin);
             if args_len < 4
@@ -238,8 +247,7 @@ classdef OTFSResGrid < handle
             % optional inputs - assign
             self.pilots         = inPar.Results.pilots;
             pilots_pow          = inPar.Results.pilots_pow;
-            
-            self.validP();
+            % calculate PG & CE area
             self.calcAreaPGCE();
             % insert
             self.insertDA(symbols);
