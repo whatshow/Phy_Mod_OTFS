@@ -150,10 +150,10 @@ classdef OTFSResGrid < handle
 
         %{
         set guards
-        @in1:               negative guard on the delay
-        @in2:               positive guard on the delay
-        @in3:               negative guard on the Doppler
-        @in4:               positive guard on the Doppler
+        @in1: (1,2) negative guard on the delay (3) negative guard on the Doppler
+        @in2: (1,2) positive guard on the delay (3) positive guard on the Doppler
+        @in3: (1) negative guard on the Doppler
+        @in4: (1) positive guard on the Doppler
         @guard_delay_full:  full guard on delay (if set true, ignore the number setting)
         @guard_doppl_full:  full guard on Doppler (if set true, ignore the number setting)
         %}
@@ -162,13 +162,17 @@ classdef OTFSResGrid < handle
             args_len = length(varargin);
             if args_len < 4
                 error("The input is not enough.");
+            else
+                args_len = 4;                % we only consider 4 numerical inputs at most
             end
             ins = [0,0,0,0];                 % guard lengths on 4 directions
             arg_opt_id_beg = args_len + 1;   % optional arguments beginning id
+            ins_len = 4;
             for arg_id = 1:args_len
                 if isnumeric(varargin{arg_id})
                     ins(arg_id) = varargin{arg_id};
                 else
+                    ins_len = arg_id - 1;
                     arg_opt_id_beg = arg_id;
                     break;
                 end
@@ -185,8 +189,12 @@ classdef OTFSResGrid < handle
             self.gk_len_ful = inPar.Results.guard_doppl_full;
             % input check - full guard
             if self.gl_len_ful
+                if ins_len == 2 % the two inputs are Doppler settings
+                    ins(3:4) = ins(1:2);
+                end
                 ins(1) = floor((self.nSubcarNum - self.pl_len)/2);
-                ins(2) = self.nSubcarNum - self.pl_len - ins(1);               
+                ins(2) = self.nSubcarNum - self.pl_len - ins(1);
+                
             end
             if self.gk_len_ful
                 ins(3) = floor((self.nTimeslotNum - self.pk_len)/2);

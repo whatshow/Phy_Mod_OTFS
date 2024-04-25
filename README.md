@@ -74,10 +74,10 @@ All codes are uniform in matlab and python in three class.
         rg.setPilot2Flex(pl_len, pk_len, pl1, pk1); // pilots in user-defined area
         ```
     * setGuard(): set the guard range<br>
-        `@in1`: negative guard on the delay<br>
-        `@in2`: positive guard on the delay<br>
-        `@in3`: negative guard on the Doppler<br>
-        `@in4`: positive guard on the Doppler<br>
+        `@in1`: (1,2) negative guard on the delay (3) negative guard on the Doppler<br>
+        `@in2`: (1,2) positive guard on the delay (3) positive guard on the Doppler<br>
+        `@in3`: (1) negative guard on the Doppler<br>
+        `@in4`: (1) positive guard on the Doppler<br>
         `@guard_delay_full`: full guard on delay (if set true, ignore the number setting)<br>
         `@guard_doppl_full`: full guard on Doppler (if set true, ignore the number setting)
         ```c, matlab, python
