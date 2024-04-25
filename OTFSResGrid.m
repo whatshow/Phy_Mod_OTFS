@@ -544,7 +544,7 @@ classdef OTFSResGrid < handle
         validate pilot settings
         %}
         function validP(self)
-            % 1st pilot coordinates & % pilot length
+            % 1st pilot coordinates & pilot length
             if self.pk_len > 0 && self.pl_len > 0
                 if self.pk1 < 1 || self.pk1 > self.nTimeslotNum
                     error("Pilot 1st location on the delay axis overflows.");
