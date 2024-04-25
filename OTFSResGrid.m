@@ -731,8 +731,8 @@ classdef OTFSResGrid < handle
         end
 
         %{
-        % estimated the channel using a sngle pilot
-        % @threshold: the threshold to detect a path
+        estimated the channel using a sngle pilot
+        @threshold: the threshold to detect a path
         %}
         function [his, lis, kis] = estimateChannel4SingPilot(self, threshold)
             % input check

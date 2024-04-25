@@ -80,18 +80,20 @@ classdef OTFS < handle
             end
         end
 
-        % set channel (in1, in2, in3)
-        % set a fixed chanel (at least two paths, if you want to add one fixed path, call `setChannelExtra`)
-        % @in1->his:        the path gains
-        % @in2->lis:        the delays
-        % @in3->kis:        the doppler shifts
-        % set a random channel (overwritten the channel setting; use Rayleigh fading if not select channel model)
-        % @in1->p:          the path number
-        % @in2->lmax:       the maxmimal delay index
-        % @in3->kmax:       the maximal Doppler index (can be fractional)
-        % @force_frac:      use fractional Doppler (force)
-        % @isAWGN:          use awgn
-        % @isRician:        use Rician fading
+        %{
+        set channel (in1, in2, in3)
+        set a fixed chanel (at least two paths, if you want to add one fixed path, call `setChannelExtra`)
+        @in1->his:        the path gains
+        @in2->lis:        the delays
+        @in3->kis:        the doppler shifts
+        set a random channel (overwritten the channel setting; use Rayleigh fading if not select channel model)
+        @in1->p:          the path number
+        @in2->lmax:       the maxmimal delay index
+        @in3->kmax:       the maximal Doppler index (can be fractional)
+        @force_frac:      use fractional Doppler (force)
+        @isAWGN:          use awgn
+        @isRician:        use Rician fading
+        %}
         function setChannel(self, in1, in2, in3, varargin)
             % optional inputs - register
             inPar = inputParser;
