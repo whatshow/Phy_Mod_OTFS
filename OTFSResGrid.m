@@ -654,7 +654,7 @@ classdef OTFSResGrid < handle
             % input check
             self.p_len = length(self.pilots);
             % input check - pilots
-            if ~isempty(self.pilots)
+            if self.p_len > 0
                 if self.p_len ~= self.pl_len*self.pk_len
                     error("The manual pilot input do not have the required number.");
                 elseif self.p_len > self.nTimeslotNum*self.nSubcarNum
@@ -666,7 +666,7 @@ classdef OTFSResGrid < handle
                 error("The pilots (linear) power is required while no manual pilot input.");
             end
             % initiate pilots if empty
-            if isempty(self.pilots)
+            if self.p_len == 0
                 self.p_len = self.pl_len*self.pk_len;
                 self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(self.p_len, 1);
             end
