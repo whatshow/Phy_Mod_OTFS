@@ -5,37 +5,19 @@ This repository is a fundamental toolbox of OTFS modulation crossing `matlab` an
 > Raviteja, P., Phan, K. T., Hong, Y., & Viterbo, E. (2018). Interference cancellation and iterative detection for orthogonal time frequency space modulation. *IEEE transactions on wireless communications, 17(10)*, 6501-6515.
 
 > Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
-## Preinstall
-This repositiory requires you to install other repositiories to support. Please click the tags below to check how to install them.
-
-[![Toolbox](https://img.shields.io/badge/Toolbox-1.0.1-white)](https://github.com/whatshow/Toolbox)
 
 ## How to install
 * Install through `Matlab Add-Ons`
-    * Install through Matlab `Get Add-Ons`: search `whatshow_phy_mod_otfs` and install it.
-    * Install through `.mltbx`: Go to ***Releases*** to download the file `*.mltbx` in the latest release to install.
+    * `HOME/Add-Ons/Get Add-Ons`: search `whatshow_toolbox` and install it.
+    * `HOME/Add-Ons/Get Add-Ons`: search `whatshow_phy_mod_otfs` and install it.
 * Install through `pip`
     ```sh
+    pip install whatshow-toolbox
     pip install whatshow-phy-mod-otfs
     ```
     * **import this module**
         ```
         from whatshow_phy_mod_otfs import OTFS
-        ```
-* Install through git under another local repositiory
-    ```sh
-    git submodule add git@github.com:whatshow/Phy_Mod_OTFS.git Modules/Mod_OTFS
-    ```
-    Now, you can see a folder `Modules` with `Mod_OTFS` inside
-    * **Import this model**
-        ```sh, c, matlab, python
-        % matlab
-        addpath("Modules/OTFS");
-        # python
-        if '.' not in __name__ :
-            from Modules.Mod_OTFS.OTFS import OTFS
-        else:
-            from .Modules.Mod_OTFS.OTFS import OTFS
         ```
 
 ## How to use
