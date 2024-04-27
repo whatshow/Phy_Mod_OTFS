@@ -145,7 +145,7 @@ All codes are uniform in matlab and python in three class.
     * getContentZeroPG(): get the content of zero PG area (return a vector)
     * getContentZeroCE(): get the content of zero CE area (return a vector)
 * OTFS: this class provides the entire process of OTFS from Tx to Rx
-    * OTFS()
+    * OTFS()<br>
         `@batch_size(opt)`: the batch size (only used in python)
     * modulate():modulate (use fast method by default)<br>
         `@rg`: an OTFS resource grid<br>
