@@ -73,10 +73,10 @@ classdef OTFSResGrid < handle
                     error("The timeslot number is not given.");
                 else
                     in2 = varargin{1};
-                    if ~isscalar(in2)
-                        error("The timeslot number is illegal.");
-                    elseif floor(in1) ~= in1
+                    if floor(in1) ~= in1
                         error("The subcarier number can only be an integer.");
+                    elseif ~isscalar(in2)
+                        error("The timeslot number is not a scalar.");
                     elseif floor(varargin{1}) ~= varargin{1}
                         error("The timeslot number can only be an integer.");
                     else
@@ -210,19 +210,13 @@ classdef OTFSResGrid < handle
                 ins(4) = self.nTimeslotNum - self.pk_len - ins(3);
             end
             % input check - guard - integers only
-            if floor(ins(1)) ~= ins(1) || floor(ins(2)) ~= ins(2)
-                error("Guard number along the delay axis must be integers.");
-            end
-            if floor(ins(3)) ~= ins(3) || floor(ins(4)) ~= ins(4)
-                error("Guard number along the Doppler axis must be integers.");
+            if floor(ins(1)) ~= ins(1) || floor(ins(2)) ~= ins(2) || floor(ins(3)) ~= ins(3) || floor(ins(4)) ~= ins(4)
+                error("Guard number along the delay/Doppler axis must be integers.");
             end
             % input check - guard - no negative
-            if ins(1) < 0 || ins(2) < 0
-                error("Guard number along the delay axis must be non-negative.");
-            end
-            if ins(3) < 0 || ins(4) < 0
-                error("Guard number along the Doppler axis must be non-negative.");
-            end           
+            if ins(1) < 0 || ins(2) < 0 || ins(3) < 0 || ins(4) < 0
+                error("Guard number along the delay/Doppler axis must be non-negative.");
+            end         
             % take inputs
             self.gl_len_neg = ins(1);
             self.gl_len_pos = ins(2);
