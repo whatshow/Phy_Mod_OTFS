@@ -74,7 +74,7 @@ All codes are uniform in matlab and python in three class.
         `@symbols`: OTFS symbols<br>
         `@pilots(opt)`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
         `@pilots_pow(opt)`: pilot power to generate random pilots
-    * setAreaCE(): set the channel estimation area manually. **You should only call this function when you disagree with our channel estimation area.**
+    * setAreaCE(): set the channel estimation area manually. **You should only call this function when you disagree with our channel estimation area.**<br>
         `@ce_l_beg`: CE delay beginning<br>
         `@ce_l_end`: CE delay ending<br>
         `@ce_k_beg`: CE Doppler beginning<br>
