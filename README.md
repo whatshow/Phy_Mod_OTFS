@@ -85,7 +85,7 @@ All codes are uniform in matlab and python in three class.
         `@threshold(opt)`: the threshold to estimate the channel
         ```c, matlab, python
         [y, his_est, lis_est, kis_est] = rg_rx.demap("threshold", 1e-10);
-        y, his_est, lis_est, kis_est = rg_rx.demap("threshold", 1e-10);
+        y, his_est, lis_est, kis_est = rg_rx.demap(threshold=1e-10);
         ```
     * clone(): clone this resource grid
     * isZP(): return zero padding length
