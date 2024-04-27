@@ -147,15 +147,19 @@ classdef OTFS < handle
                 lmin= 1;
                 kmin = -kmax;
                 taps_max = (kmax - kmin + 1)*(lmax - lmin + 1);
-                delay_taps_all = kron(lmin:lmax, ones(1, kmax - kmin + 1)); % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
-                Doppler_taps_all = repmat(kmin:kmax, 1, lmax - lmin + 1); % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
-                taps_selected_idx = self.shufSelectTopNIdx(taps_max, p); % select P paths from all possible paths
+                % create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
+                l_combs = kron(lmin:lmax, ones(1, kmax - kmin + 1));
+                % create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
+                k_combs = repmat(kmin:kmax, 1, lmax - lmin + 1);
+                % select P paths from all possible paths
+                taps_selected_idx = self.shufSelectTopNIdx(taps_max, p);
                 % CSI - delay
-                self.delay_taps = delay_taps_all(taps_selected_idx);
+                self.delay_taps = l_combs(taps_selected_idx);
                 self.delay_taps(find(self.delay_taps == min(self.delay_taps), 1)) = 0;
                 % CSI - doppler
-                self.doppler_taps = Doppler_taps_all(taps_selected_idx);
-                if force_frac   % add fractional Doppler
+                self.doppler_taps = k_combs(taps_selected_idx);
+                % add fractional Doppler
+                if force_frac
                     doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
                     doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                     doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
@@ -168,11 +172,11 @@ classdef OTFS < handle
                 % CSI - others
                 self.taps_num = p;
                 if isAWGN
-                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (ones(1, p)+1i*ones(1, p)));
+                    self.chan_coef = sqrt(1/2/p)*(ones(1, p)+1i*ones(1, p));
                 elseif isRician
-                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (ones(1, p)+1i*ones(1, p))) + sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p)));
+                    self.chan_coef = [sqrt(1/2/p), sqrt(1/2/p)*(randn(1, p-1)+1i*randn(1, p-1))];
                 else
-                    self.chan_coef = sqrt(1/p)*(sqrt(1/2) * (randn(1, p)+1i*randn(1, p))); % use Rayleigh fading by default
+                    self.chan_coef = sqrt(1/2/p)*(randn(1, p)+1i*randn(1, p)); % use Rayleigh fading by default
                 end
                 self.cp_len = max(self.delay_taps);
             else
@@ -636,26 +640,6 @@ classdef OTFS < handle
                 Qi = deltaMati*kron(idftmat, eye(self.nSubcarNum));
                 Ti = Pi*Qi;
                 H_DD = H_DD + hi*Ti;
-            end
-        end
-
-        %{
-        symbol mapping (hard)
-        @syms: a vector of symbols
-        @constellation: the constellation to map
-        %}
-        function syms_mapped = symmap(self, syms)
-            if ~isvector(syms)
-                error("Symbols must be into a vector form to map.");
-            end
-            % the input must be a column vector
-            is_syms_col = iscolumn(syms);
-            syms = syms(:);
-            syms_dis = abs(syms - self.constellation).^2;
-            [~,syms_dis_min_idx] =  min(syms_dis,[],2);
-            syms_mapped = self.constellation(syms_dis_min_idx);
-            if is_syms_col
-                syms_mapped = syms_mapped(:);
             end
         end
     end

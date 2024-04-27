@@ -311,5 +311,24 @@ classdef OTFSDetector < handle
                 end
             end
         end
+
+        %{
+        symbol mapping (hard)
+        @syms: a vector of symbols
+        %}
+        function syms_mapped = symmap(self, syms)
+            if ~isvector(syms)
+                error("Symbols must be into a vector form to map.");
+            end
+            % the input must be a column vector
+            is_syms_col = iscolumn(syms);
+            syms = syms(:);
+            syms_dis = abs(syms - self.constel).^2;
+            [~,syms_dis_min_idx] =  min(syms_dis,[],2);
+            syms_mapped = self.constel(syms_dis_min_idx);
+            if is_syms_col
+                syms_mapped = syms_mapped(:);
+            end
+        end
     end
 end
