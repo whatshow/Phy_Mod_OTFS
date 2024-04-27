@@ -17,7 +17,7 @@ path_file = os.path.normpath(path_folder+"/_data/Samples/Tests/RG/test_rg.mat");
 try:
     matlab_data = scipy.io.loadmat(path_file);
 except FileNotFoundError:
-    raise Exception("You have to run `Samples/Tests/test_case_01_gen_data.m` to create data.");
+    raise Exception("You have to run matlab script to generate data.");
 M = np.squeeze(matlab_data["M"]);
 N = np.squeeze(matlab_data["N"]);
 pil_pow = np.squeeze(matlab_data["pil_pow"]);

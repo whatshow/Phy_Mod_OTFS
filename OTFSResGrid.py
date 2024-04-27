@@ -28,7 +28,7 @@ class OTFSResGrid(MatlabFuncHelper):
     pulse_type = PULSE_NO;
     # pilot
     pilot_type = PILOT_TYPE_EM;
-    pilots = [];
+    pilots = np.array([]);
     p_len = 0;
     pl1 = 0;                                            # 1st (lowest) pilot location in delay axis
     pk1 = 0;                                            # 1st (lowest) pilot location in Doppler axis
@@ -70,19 +70,23 @@ class OTFSResGrid(MatlabFuncHelper):
         if batch_size is not None:
             self.batch_size = batch_size;
         # inputs
-        if isinstance(in1, int):
+        in1 = self.squeeze(in1);
+        if in1.ndim == 0:
             if len(args) < 1:
                 raise Exception("The timeslot number is not given.");
             else:
-                in2 = args[0];
-                if not isinstance(in2, int):
+                in2 = self.squeeze(args[0]);
+                if floor(in1) != in1:
+                    raise Exception("The subcarier number can only be an integer.");
+                if in2.ndim > 0:
+                    raise Exception("The timeslot number is not a scalar.");
+                elif floor(in2) != in2:
                     raise Exception("The timeslot number can only be an integer.");
                 else:
-                    self.nSubcarNum = in1;
-                    self.nTimeslotNum = in2;
+                    self.nSubcarNum = in1.astype(int);
+                    self.nTimeslotNum = in2.astype(int);
                     self.content = self.zeros(self.nTimeslotNum, self.nSubcarNum).astype(np.complex_);
         else:
-            in1 = np.asarray(in1);
             if self.batch_size == self.BATCH_SIZE_NO and in1.ndim < 2 or self.batch_size != self.BATCH_SIZE_NO and in1.ndim < 3:
                 in1 = np.expand_dims(in1, axis=-2);
             self.content = in1;
@@ -116,8 +120,8 @@ class OTFSResGrid(MatlabFuncHelper):
         self.pilot_loc_type = self.PILOT_LOC_CENTER;
         self.pl_len = pl_len;
         self.pk_len = pk_len;
-        self.pl1 = floor((self.nSubcarNum - self.pl_len)/2);
-        self.pk1 = floor((self.nTimeslotNum - self.pk_len)/2);
+        self.pl1 = floor((self.nSubcarNum - self.pl_len)/2).astype(int);
+        self.pk1 = floor((self.nTimeslotNum - self.pk_len)/2).astype(int);
         self.validP();
     def setPilot2ZP(self, pl_len, pk_len):
         if self.zp_len == 0:
@@ -125,8 +129,8 @@ class OTFSResGrid(MatlabFuncHelper):
         self.pilot_loc_type = self.PILOT_LOC_ZP;
         self.pl_len = pl_len;
         self.pk_len = pk_len;
-        self.pl1 = floor((self.nSubcarNum - self.pl_len)/2);
-        self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2);
+        self.pl1 = floor((self.nSubcarNum - self.pl_len)/2).astype(int);
+        self.pk1 = self.nTimeslotNum - self.zp_len + floor((self.zp_len - self.pk_len)/2).astype(int);
         self.validP();
     def setPilot2Flex(self, pl_len, pk_len, pl1, pk1):
         self.pilot_loc_type = self.PILOT_LOC_FLEX;
@@ -151,9 +155,7 @@ class OTFSResGrid(MatlabFuncHelper):
             raise Exception("Pilots must be set before setting guards.");
         # take inputs
         args_len = len(args);
-        if args_len < 4:
-            raise Exception("The input is not enough.");    # we only consider 4 numerical inputs at most
-        ins = [0,0,0,0];                                    # guard lengths on 4 directions
+        ins = np.asarray([0,0,0,0]);                                  # guard lengths on 4 directions
         ins_len = args_len;
         for arg_id in range(args_len):
             ins[arg_id] = args[arg_id];
@@ -169,15 +171,11 @@ class OTFSResGrid(MatlabFuncHelper):
             ins[2] = floor((self.nTimeslotNum - self.pk_len)/2);
             ins[3] = self.nTimeslotNum - self.pk_len - ins[2];
         # input check - guard - integers only
-        if not isinstance(ins[0], int) or not isinstance(ins[1], int):
-            raise Exception("Guard number along the delay axis must be integers.");
-        if not isinstance(ins[2], int) or not isinstance(ins[3], int):
-            raise Exception("Guard number along the Doppler axis must be integers.");
+        if ins.dtype != np.intc and ins.dtype != np.uintc and ins.dtype != np.int_ :
+            raise Exception("Guard number along the delay/Doppler axis must be integers.");
         # input check - guard - no negative
-        if ins[0] < 0 or ins[1] < 0:
-            raise Exception("Guard number along the delay axis must be non-negative.");
-        if ins[2] < 0 or ins[3] < 0:
-            raise Exception("Guard number along the Doppler axis must be non-negative.");         
+        if ins[0] < 0 or ins[1] < 0 or  ins[2] < 0 or ins[3] < 0:
+            raise Exception("Guard number along the delay/Doppler axis must be non-negative.");       
         # take inputs
         self.gl_len_neg = ins[0];
         self.gl_len_pos = ins[1];
@@ -257,6 +255,7 @@ class OTFSResGrid(MatlabFuncHelper):
     '''
     def clone(self):
         rg = OTFSResGrid(self.content);
+        rg.batch_size = self.batch_size;
         rg.zp_len = self.zp_len;
         rg.pulse_type = self.pulse_type;
         rg.pilots = self.pilots;
@@ -289,7 +288,7 @@ class OTFSResGrid(MatlabFuncHelper):
     '''
     def isPG(self):
         # check whether pilots is assigned or not
-        is_pg = self.pilots[-1] > 0;
+        is_pg = self.pilots.shape[-1] > 0;
         # check whether pilot and guard area is calculated
         is_pg = is_pg and self.pg_num > 0;
         # check whether CE area is calulated
@@ -459,26 +458,25 @@ class OTFSResGrid(MatlabFuncHelper):
             # calculate PG area
             if self.pilot_type == self.PILOT_TYPE_EM:
                 # PG area only exist when using embedded pilots
-                self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
-                self.pg_delay_beg = self.pl1 - self.gl_len_neg;
-                self.pg_delay_end = self.pl1 + self.pl_len - 1 + self.gl_len_pos;
-                self.pg_doppl_beg = self.pk1 - self.gk_len_neg;
-                self.pg_doppl_end = self.pk1 + self.pk_len - 1 + self.gk_len_pos;
-            
+                self.pg_num = ((self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos)).astype(int);
+                self.pg_delay_beg = (self.pl1 - self.gl_len_neg).astype(int);
+                self.pg_delay_end = (self.pl1 + self.pl_len - 1 + self.gl_len_pos).astype(int);
+                self.pg_doppl_beg = (self.pk1 - self.gk_len_neg).astype(int);
+                self.pg_doppl_end = (self.pk1 + self.pk_len - 1 + self.gk_len_pos).astype(int);
             # calulate channel estimate area
             if self.gl_len_ful:
                 self.ce_delay_beg = 0;
-                self.ce_delay_end = self.nSubcarNum - 1;
+                self.ce_delay_end = (self.nSubcarNum - 1).astype(int);
             else:
-                self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
-                self.ce_delay_end = self.pg_delay_end;
+                self.ce_delay_beg = (self.pg_delay_beg + self.gl_len_neg).astype(int);
+                self.ce_delay_end = (self.pg_delay_end).astype(int);
             if self.gk_len_ful:
                 self.ce_doppl_beg = 0;
-                self.ce_doppl_end = self.nTimeslotNum - 1;
+                self.ce_doppl_end = (self.nTimeslotNum - 1).astype(int);
             else:
-                self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
-                self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
-            self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
+                self.ce_doppl_beg = (self.pg_doppl_beg + floor(self.gk_len_neg/2)).astype(int);
+                self.ce_doppl_end = (self.pg_doppl_end - floor(self.gk_len_pos/2)).astype(int);
+            self.ce_num = ((self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1)).astype(int);
 
     '''
     insert data
@@ -511,7 +509,7 @@ class OTFSResGrid(MatlabFuncHelper):
                         else:
                             self.content[..., doppl_id, delay_id] = symbols[..., symbols_id];
                         symbols_id = symbols_id + 1;
-            assert(symbols_id - 1 == data_num);
+            assert(symbols_id == data_num);
 
     '''
     insert pilots
@@ -532,14 +530,15 @@ class OTFSResGrid(MatlabFuncHelper):
         # initiate pilots if empty
         if self.p_len == 0:
             self.p_len = self.pl_len*self.pk_len;
-            self.pilots = sqrt(pilots_pow/2)*(1+1j)*self.ones(self.p_len);
+            self.pilots = sqrt(pilots_pow/2)*(1+1j)*np.ones(self.p_len);
         # allocate pilots
         if self.p_len != 0:
             # allocate pilots
             if self.batch_size == self.BATCH_SIZE_NO:
-                self.content[self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1] = self.content[self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1] + self.reshape(self.pilots, self.pk_len, self.pl_len);
+                self.content[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.content[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] + self.reshape(self.pilots, self.pk_len, self.pl_len);
             else:
-                self.content[..., self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1] = self.content[..., self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1] + self.reshape(self.pilots, self.pk_len, self.pl_len);
+                pilots = np.tile(np.reshape(self.pilots, (self.pk_len, self.pl_len)), (self.batch_size, 1, 1));
+                self.content[..., self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.content[..., self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] + pilots;
 
     '''
     decide whether the current location is in CE area
@@ -594,25 +593,22 @@ class OTFSResGrid(MatlabFuncHelper):
         if self.p_len != 1:
             raise Exception("There should be only 1 pilot.");
         
-        # estimate the channel
-        his = [[]] if self.batch_size == self.BATCH_SIZE_NO else [[]]*self.batch_size;
-        lis = [[]] if self.batch_size == self.BATCH_SIZE_NO else [[]]*self.batch_size;
-        kis = [[]] if self.batch_size == self.BATCH_SIZE_NO else [[]]*self.batch_size;
-        his = np.asarray(his);
-        lis = np.asarray(lis);
-        kis = np.asarray(kis);
-        for delay_id in self.seq(self.ce_delay_beg, self.ce_delay_end, order='F'):
-            for doppl_id in self.seq(self.ce_doppl_beg, self.ce_doppl_end, order='F'):
-                pss_ys = [self.content(doppl_id, delay_id)] if self.batch_size == self.BATCH_SIZE_NO else self.content(..., doppl_id, delay_id);
+        # estimate the channe
+        his = [];
+        kis = [];
+        lis = [];
+        for delay_id in range(self.ce_delay_beg, self.ce_delay_end+1):
+            for doppl_id in range(self.ce_doppl_beg, self.ce_doppl_end+1):
+                pss_ys = np.expand_dims(self.content[doppl_id, delay_id], axis=0) if self.batch_size == self.BATCH_SIZE_NO else self.content[..., doppl_id, delay_id];
                 pss_ys_ids_yes = abs(pss_ys) > threshold;
-                pss_ys_ids_not = abs(pss_ys) > threshold;
+                pss_ys_ids_not = abs(pss_ys) <= threshold;
                 li = delay_id - self.pl1;
                 ki = doppl_id - self.pk1;
                 if self.pulse_type == self.PULSE_IDEAL:
                     pss_beta = exp(-2j*pi*li*ki/self.nSubcarNum/self.nTimeslotNum);
                 elif self.pulse_type == self.PULSE_RECTA:
-                    pss_beta = exp(2j*pi*(self.pl1 - 1)*ki/self.nSubcarNum/self.nTimeslotNum);
-                hi = pss_ys/self.pilots/pss_beta;
+                    pss_beta = exp(2j*pi*self.pl1*ki/self.nSubcarNum/self.nTimeslotNum);
+                hi = pss_ys/self.pilots[0]/pss_beta;
                 # at least we find one path
                 if np.sum(pss_ys_ids_yes, axis=None) > 0:
                     if self.batch_size == self.BATCH_SIZE_NO:
@@ -620,8 +616,16 @@ class OTFSResGrid(MatlabFuncHelper):
                         lis = np.append(lis, li);
                         kis = np.append(kis, ki);
                     else:
-                        his[:, pss_ys_ids_yes] = hi[:, pss_ys_ids_yes];
-                        his[:, pss_ys_ids_not] = 0;
-                        lis = np.append(lis, [[li]]*self.batch_size);
-                        kis = np.append(kis, [[ki]]*self.batch_size);
-        return self.squeeze(his), self.squeeze(lis), self.squeeze(kis);
+                        hi[pss_ys_ids_not] = 0;
+                        hi = hi[..., np.newaxis];
+                        li = np.tile(li, (self.batch_size, 1));
+                        ki = np.tile(ki, (self.batch_size, 1));
+                        if isinstance(his, list):
+                            his = hi;
+                            lis = li;
+                            kis = ki;
+                        else:
+                            his = np.append(his, hi, axis=-1);
+                            lis = np.append(lis, li, axis=-1);
+                            kis = np.append(kis, ki, axis=-1);
+        return his, lis, kis;

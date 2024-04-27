@@ -133,11 +133,8 @@ classdef OTFS < handle
                 if kmax_frac > eps
                     force_frac = true;
                 else
-                    if ~isempty(varargin)
-                        force_frac = varargin{1};
-                        if force_frac
-                            kmax_frac = 0.5;
-                        end
+                    if force_frac
+                        kmax_frac = 0.5;
                     end
                 end
                 % input check
@@ -279,9 +276,11 @@ classdef OTFS < handle
                 if isFast
                     self.Y_DD = fft(r_mat.')/sqrt(self.nTimeslotNum);
                 else 
-                    self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum);  % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
+                    % Wigner transform (Y_TF in [nSubcarNum, nTimeslotNum])
+                    self.Y_TF = fft(r_mat)/sqrt(self.nSubcarNum);
                     Y_FT = self.Y_TF.';
-                    self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum); % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
+                    % SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
+                    self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum);
                 end
             end
             self.rg.setContent(self.Y_DD);
@@ -423,8 +422,7 @@ classdef OTFS < handle
     % private methods
     methods(Access=private)
         %{
-        shuffle and select top n elements' indices
-        @total: 
+        shuffle and select top n elements' indices 
         %}
         function idx = shufSelectTopNIdx(~, taps_max, p)
             taps_idx_chaotic = randperm(taps_max);
@@ -445,8 +443,7 @@ classdef OTFS < handle
                 s_mat = reshape(self.s, self.nSubcarNum, self.nTimeslotNum);
                 s_mat = [s_mat(end - self.cp_len + 1 : end, :); s_mat];
                 s_cp = s_mat(:);
-                s_cp_t_mat = repmat((-self.cp_len:self.nSubcarNum-1)', 1, self.nTimeslotNum);
-                s_cp_t = s_cp_t_mat(:);
+                s_cp_t = repmat((-self.cp_len:self.nSubcarNum-1)', self.nTimeslotNum, 1);
             end
         end
 
@@ -460,8 +457,8 @@ classdef OTFS < handle
             elseif self.cp_type == self.CP_ONE_FRAM
                 s_chan_rm = s_chan(self.cp_len+1 : self.cp_len+self.nTimeslotNum*self.nSubcarNum);
             elseif self.cp_type == self.CP_ONE_FRAM_SUB
-                s_chan_mat = reshape(s_chan, self.nSubcarNum, self.nTimeslotNum);
-                s_chan_rm_mat = s_chan_mat(self.cp_len+1:self.cp_len+self.nTimeslotNum*self.nSubcarNum, :);
+                s_chan_mat = reshape(s_chan, [], self.nTimeslotNum);
+                s_chan_rm_mat = s_chan_mat(self.cp_len+1:self.cp_len+self.nSubcarNum, :);
                 s_chan_rm = s_chan_rm_mat(:);
             end
         end
@@ -600,7 +597,10 @@ classdef OTFS < handle
                         hi = his(tap_id);
                         li = lis(tap_id);
                         ki = kis(tap_id);
-                        hw(k, l)= hw(k, l) + 1/self.sig_len*hi*exp(-2j*pi*li*ki/self.sig_len)*sum(exp(2j*pi*(l-li)*(0:self.nSubcarNum-1)/self.nSubcarNum))*sum(exp(-2j*pi*(k-ki)*(0:self.nTimeslotNum-1)/self.nTimeslotNum));
+                        hw_add = 1/self.sig_len*hi*exp(-2j*pi*li*ki/self.sig_len)* ...
+                                sum(exp(2j*pi*(l-li)*(0:self.nSubcarNum-1)/self.nSubcarNum))* ...
+                                sum(exp(-2j*pi*(k-ki)*(0:self.nTimeslotNum-1)/self.nTimeslotNum));
+                        hw(k, l)= hw(k, l) + hw_add;
                     end
                     H_DD = H_DD + hw(k, l)*kron(circshift(eye(self.nTimeslotNum), k), circshift(eye(self.nSubcarNum), l));
                 end
@@ -620,10 +620,10 @@ classdef OTFS < handle
                 error("Cannot build the rectangular pulse DD channel while not using rectanular pulse.");
             end
             % build H_DD
-            H_DD = zeros(self.sig_len, self.sig_len); % intialize the return channel
-            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum); % DFT matrix
-            idftmat = conj(dftmat); % IDFT matrix 
-            piMat = eye(self.sig_len); % permutation matrix (from the delay) -> pi
+            H_DD = zeros(self.sig_len, self.sig_len);                       % intialize the return channel
+            dftmat = dftmtx(self.nTimeslotNum)/sqrt(self.nTimeslotNum);     % DFT matrix
+            idftmat = conj(dftmat);                                         % IDFT matrix 
+            piMat = eye(self.sig_len);                                      % permutation matrix (from the delay) -> pi
             % accumulate all paths
             for tap_id = 1:p
                 hi = his(tap_id);

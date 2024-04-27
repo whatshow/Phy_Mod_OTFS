@@ -27,7 +27,8 @@ All codes are uniform in matlab and python in three class.
     * OTFSResGrid()<br>
         `@in1`: 1st input, a scalar for subcarrier number or the content directly<br>
         `@in2`: only if 1st input is scalar, this input is the `nTimeslotNum`<br>
-        `@zp_len`: zero padding length
+        `@zp_len(opt)`: zero padding length
+        `@batch_size(opt):` the batch size (only used in python)
         ```c, matlab, python
         rg = OTFSResGrid(M, N);     // build a RG (give subcarrier number and timeslot number)
         rg = OTFSResGrid(X_DD);     // build a RG (give X_DD matrix directly)
@@ -60,8 +61,8 @@ All codes are uniform in matlab and python in three class.
         `@in2`: (1,2) positive guard on the delay (3) positive guard on the Doppler<br>
         `@in3`: (1) negative guard on the Doppler<br>
         `@in4`: (1) positive guard on the Doppler<br>
-        `@guard_delay_full`: full guard on delay (if set true, ignore the number setting)<br>
-        `@guard_doppl_full`: full guard on Doppler (if set true, ignore the number setting)
+        `@guard_delay_full(opt)`: full guard on delay (if set true, ignore the number setting)<br>
+        `@guard_doppl_full(opt)`: full guard on Doppler (if set true, ignore the number setting)
         ```c, matlab, python
         // set guard range manually
         rg.setGuard(guard_delay_num_neg, guard_delay_num_pos, guard_doppl_num_neg, guard_doppl_num_pos);
@@ -71,17 +72,17 @@ All codes are uniform in matlab and python in three class.
         ```
     * map(): `symbols` is mandatory, `pilots_pow` and `pilots_pow` must use one if you want to use pilots. Other parameters define the length of pilots and the guards area around the pilots. If the guard area is oversize, you are suggested to use full guard on that axis so that the channel estimation result will be more accurate.<br>
         `@symbols`: OTFS symbols<br>
-        `@pilots`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
-        `@pilots_pow`: pilot power to generate random pilots
+        `@pilots(opt)`: a vector of your pilots (if given `pilots_pow` won't be used)<br>
+        `@pilots_pow(opt)`: pilot power to generate random pilots
     * setAreaCE(): set the channel estimation area manually. **You should only call this function when you disagree with our channel estimation area.**
         `@ce_l_beg`: CE delay beginning<br>
         `@ce_l_end`: CE delay ending<br>
         `@ce_k_beg`: CE Doppler beginning<br>
         `@ce_k_end`: CE Doppler ending<br>
     * demap()<br>
-        `@isData`: whether give the data (true by default)<br>
-        `@isCE`: whether give the channel estimation result(true by default)<br>
-        `@threshold`: the threshold to estimate the channel
+        `@isData(opt)`: whether give the data (true by default)<br>
+        `@isCE(opt)`: whether give the channel estimation result(true by default)<br>
+        `@threshold(opt)`: the threshold to estimate the channel
         ```c, matlab, python
         [y, his_est, lis_est, kis_est] = rg_rx.demap("threshold", 1e-10);
         y, his_est, lis_est, kis_est = rg_rx.demap("threshold", 1e-10);
@@ -132,7 +133,7 @@ All codes are uniform in matlab and python in three class.
         nSubcarNum, nTimeslotNum = rg.getContentSize();
         ```
     * getContent(): get the content<br>
-        `@isVector`: if true, the returned result is a vector
+        `@isVector(opt)`: if true, the returned result is a vector
         ```c, matlab, python
         rg.getContent();
         // vectorized results
@@ -144,9 +145,11 @@ All codes are uniform in matlab and python in three class.
     * getContentZeroPG(): get the content of zero PG area (return a vector)
     * getContentZeroCE(): get the content of zero CE area (return a vector)
 * OTFS: this class provides the entire process of OTFS from Tx to Rx
+    * OTFS()
+        `@batch_size(opt)`: the batch size (only used in python)
     * modulate():modulate (use fast method by default)<br>
         `@rg`: an OTFS resource grid<br>
-        `@isFast`: DD domain -> TD domain (no X_TF)
+        `@isFast(opt)`: DD domain -> TD domain (no X_TF)
         ```c, matlab, python
         // fast modulate
         otfs.modulate(rg);
@@ -163,9 +166,9 @@ All codes are uniform in matlab and python in three class.
             `@in1->p`: the path number<br>
             `@in2->lmax`: the maxmimal delay index<br>
             `@in3->kmax`: the maximal Doppler index (can be fractional)<br>
-            `@force_frac`: use fractional Doppler (force)<br>
-            `@isAWGN`: use awgn<br>
-            `@isRician`: use Rician fading<br>
+            `@force_frac(opt)`: use fractional Doppler (force)<br>
+            `@isAWGN(opt)`: use awgn<br>
+            `@isRician(opt)`: use Rician fading<br>
             ```c, matlab, python
             otfs.setChannel(p,lmax,kmax);
             // optional inputs
@@ -186,7 +189,7 @@ All codes are uniform in matlab and python in three class.
         otfs.passChannel(No);
         ```
     * demodulate(): demodulate (use fast method by default)<br>
-        `@isFast`: TD domain -> DD domain (no Y_TF) 
+        `@isFast(opt)`: TD domain -> DD domain (no Y_TF) 
         ```c, matlab, python
         rg = otfs.demodulate();
         ```
@@ -194,24 +197,24 @@ All codes are uniform in matlab and python in three class.
         `@his`: the channel gains<br>
         `@lis`: the channel delays<br>
         `@kis`: the channel Dopplers<br>
-        `@data_only`: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
+        `@data_only(opt)`: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
         ```c, matlab, python
         // the channel only for data
         Hdd = otfs.getChannel("data_only", true);
         Hdd = otfs.getChannel(data_only=True);
         ```
     * getCSI(): get the channel state information
-        `@sort_by_gain`: sort axis, false by defaut<br>
-        `@sort_by_delay_doppler`: sort axes, false by defaut<br>
-        `@sort_by_doppler_delay`: sort axes, false by defaut<br>
-        `@descend`: sort direction, false by defaut
+        `@sort_by_gain(opt)`: sort axis, false by defaut<br>
+        `@sort_by_delay_doppler(opt)`: sort axes, false by defaut<br>
+        `@sort_by_doppler_delay(opt)`: sort axes, false by defaut<br>
+        `@descend(opt)`: sort direction, false by defaut
         ```c, matlab, python
         otfs.getCSI("sort_by_delay_doppler", true);
         otfs.getCSI(sort_by_delay_doppler=True);
         ```
     * getXTF(): get the signal in the TF domain
     * getXT(): get the signal in the time domains
-        `@fft_size`: the size of fft
+        `@fft_size(opt)`: the size of fft
 * OTFSDetect: this class provides dedicated OTFS detectors
     * OTFSDetector()<br>
         `@constel`: the constellation (a vector)
@@ -220,8 +223,8 @@ All codes are uniform in matlab and python in three class.
         ```
     * Select a detector
         * useMPBase(): set detector types - MP Base<br>
-            `@n_ite`: the iteration number (200 by default)<br>
-            `@delta_fra`: the percentage for taking the values in the current iteration
+            `@n_ite(opt)`: the iteration number (200 by default)<br>
+            `@delta_fra(opt)`: the percentage for taking the values in the current iteration
             ```c, matlab, python
             od.useMPBase();
             od.useMPBase("n_ite", 10, "delta_fra", 0.9);
@@ -244,6 +247,8 @@ Before running any sample code, please make sure you are at the root path of thi
 * `Tests`
     * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
     * `./CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
+    * `./OTFS`: test `OTFS` class
+    * `./RG`: test `OTFSResGrid` class
     * `test_ce_getcsi`: test `getCSI()` using `sort`
     * `test_ce_detect_*`: test channel estimation and detection together
     * `test_ch_*`: test the channel functions for `OTFS`
