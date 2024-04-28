@@ -559,21 +559,21 @@ classdef OTFSResGrid < handle
         calculate PG & CE area
         %}
         function calcAreaPGCE(self)
-            % overflow check
-            if self.pl1 - self.gl_len_neg <= 0
-                error("The guard (neg) on delay axis overflows.");
-            end
-            if (self.pl1+self.pl_len-1) + self.gl_len_pos > self.nSubcarNum
-                error("The guard (pos) on delay axis overflows.");
-            end
-            if self.pk1 - self.gk_len_neg <= 0
-                error("The guard (neg) on Doppler axis overflows.");
-            end
-            if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
-                error("The guard (pos) on Doppler axis overflows.");
-            end
-            % calculate area
             if self.pl_len > 0 && self.pk_len > 0
+                % overflow check
+                if self.pl1 - self.gl_len_neg <= 0
+                    error("The guard (neg) on delay axis overflows.");
+                end
+                if (self.pl1+self.pl_len-1) + self.gl_len_pos > self.nSubcarNum
+                    error("The guard (pos) on delay axis overflows.");
+                end
+                if self.pk1 - self.gk_len_neg <= 0
+                    error("The guard (neg) on Doppler axis overflows.");
+                end
+                if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
+                    error("The guard (pos) on Doppler axis overflows.");
+                end
+                % calculate area
                 % calculate PG area
                 if self.pilot_type == self.PILOT_TYPE_EM
                     % PG area only exist when using embedded pilots
@@ -656,7 +656,7 @@ classdef OTFSResGrid < handle
                 end
             end
             % input check - pilot power
-            if self.p_len == 0 && isnan(pilots_pow)
+            if self.p_len == 0 && isnan(pilots_pow) && self.pk_len > 0 && self.pl_len > 0
                 error("The pilots (linear) power is required while no manual pilot input.");
             end
             % initiate pilots if empty
