@@ -1,6 +1,5 @@
 import numpy as np
 from numpy import floor, sqrt, kron
-from numpy import tile as repmat
 from numpy.fft import fft, ifft
 from whatshow_toolbox import MatlabFuncHelper
 from OTFSResGrid import OTFSResGrid
@@ -135,7 +134,7 @@ class OTFS(MatlabFuncHelper):
             # create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
             l_combs = kron(np.arange(1, lmax + 1), np.ones((1, kmax - kmin + 1)));
             # create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
-            k_combs = repmat(np.arange(-kmax, kmax + 1), (1, lmax- lmin + 1));
+            k_combs = np.tile(np.arange(-kmax, kmax + 1), (1, lmax- lmin + 1));
             # select P paths from all possible paths
             taps_selected_idx = self.shufSelectTopNIdx(taps_max, p);
             # CSI - delay
