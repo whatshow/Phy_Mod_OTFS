@@ -573,7 +573,6 @@ classdef OTFSResGrid < handle
                 if (self.pk1+self.pk_len-1) + self.gk_len_pos > self.nTimeslotNum
                     error("The guard (pos) on Doppler axis overflows.");
                 end
-                % calculate area
                 % calculate PG area
                 if self.pilot_type == self.PILOT_TYPE_EM
                     % PG area only exist when using embedded pilots

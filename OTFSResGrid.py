@@ -444,17 +444,16 @@ class OTFSResGrid(MatlabFuncHelper):
     calculate PG & CE area
     '''
     def calcAreaPGCE(self):
-        # overflow check
-        if self.pl1 - self.gl_len_neg < 0:
-            raise Exception("The guard (neg) on delay axis overflows.");
-        if (self.pl1+self.pl_len-1) + self.gl_len_pos >= self.nSubcarNum:
-            raise Exception("The guard (pos) on delay axis overflows.");
-        if self.pk1 - self.gk_len_neg < 0:
-            raise Exception("The guard (neg) on Doppler axis overflows.");
-        if (self.pk1+self.pk_len-1) + self.gk_len_pos >= self.nTimeslotNum:
-            raise Exception("The guard (pos) on Doppler axis overflows.");
-        # calculate area
         if self.pl_len > 0 and self.pk_len > 0:
+            # overflow check
+            if self.pl1 - self.gl_len_neg < 0:
+                raise Exception("The guard (neg) on delay axis overflows.");
+            if (self.pl1+self.pl_len-1) + self.gl_len_pos >= self.nSubcarNum:
+                raise Exception("The guard (pos) on delay axis overflows.");
+            if self.pk1 - self.gk_len_neg < 0:
+                raise Exception("The guard (neg) on Doppler axis overflows.");
+            if (self.pk1+self.pk_len-1) + self.gk_len_pos >= self.nTimeslotNum:
+                raise Exception("The guard (pos) on Doppler axis overflows.");
             # calculate PG area
             if self.pilot_type == self.PILOT_TYPE_EM:
                 # PG area only exist when using embedded pilots
@@ -525,7 +524,7 @@ class OTFSResGrid(MatlabFuncHelper):
             elif self.p_len > self.nTimeslotNum*self.nSubcarNum:
                 raise Exception("The manual pilot input overflows (over the OTFS frame size).");
         # input check - pilot power
-        if self.p_len == 0 and pilots_pow == None:
+        if self.p_len == 0 and pilots_pow == None and self.pk_len>0 and self.pl_len>0:
             raise Exception("The pilots (linear) power is required while no manual pilot input.");
         # initiate pilots if empty
         if self.p_len == 0:
