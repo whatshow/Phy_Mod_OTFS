@@ -542,8 +542,8 @@ classdef OTFS < handle
         %}
         function H_DD = removeNoDAChannel(self, H_DD)
             %TODO: remove zero padding area
-            invalud_row = NaN(1, self.sig_len);
-            invalud_col = NaN(self.sig_len, 1);
+            invalud_row = nan(1, self.sig_len);
+            invalud_col = nan(self.sig_len, 1);
             [pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end] = self.rg.getAreaPG();
             [ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end] = self.rg.getAreaCE();
             % mark redundant values - columns (PG area)
@@ -567,7 +567,7 @@ classdef OTFS < handle
             % remove
             % remove - columns
             if pg_num > 0
-                col_idx = ((sum(isnan(H_DD)) == self.sig_len));
+                col_idx = sum(isnan(H_DD)) == self.sig_len;
                 H_DD(:, col_idx) = [];
             end
             % remove - rows

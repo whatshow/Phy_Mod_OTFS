@@ -38,7 +38,7 @@ class OTFS(MatlabFuncHelper):
     pulse_type = PULSE_RECTA;
     # cp
     cp_type = CP_ONE_FRAM;
-    cp_len = 0;
+    cp_len = -0;
     
     ###########################################################################
     # General Methods
@@ -112,7 +112,7 @@ class OTFS(MatlabFuncHelper):
                 self.chan_coef = in1;
                 self.delay_taps = in2;
                 self.doppler_taps = in3;
-                self.cp_len = np.max(self.delay_taps);
+                self.cp_len = np.max(self.delay_taps).astype(int);
         elif in1.ndim == 0 and in2.ndim == 0 and in3.ndim == 0:
             # scalar, random paths
             p = in1;
@@ -161,7 +161,7 @@ class OTFS(MatlabFuncHelper):
                 self.chan_coef = np.append(rician_1st_path, sqrt(1/2/p)*(self.randn(p-1)+1j*self.randn(p-1)));
             else:
                 self.chan_coef = sqrt(1/2/p)*(self.randn(p)+1j*self.randn(p)); # use Rayleigh fading by default
-            self.cp_len = np.max(self.delay_taps);
+            self.cp_len = np.max(self.delay_taps).astype(int);
         else:
             raise Exception("The given CSI is not recognised.");
     
@@ -262,6 +262,80 @@ class OTFS(MatlabFuncHelper):
         return self.rg;
     
     ###########################################################################
+    # Getters & Setters
+    '''
+    Get the channel matrix in Delay Doppler Domain
+    @his:   the channel gains
+    @lis:   the channel delays
+    @kis:   the channel Dopplers
+    @data_only: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
+    '''
+    def getChannel(self, *, his=None, lis=None, kis=None, data_only=True):
+        # input check & init
+        if his is not None:
+            his = np.asarray(his);
+            lis = np.asarray(lis);
+            kis = np.asarray(kis);
+            if not self.isvector(his) and not self.isvector(lis) and not self.isvector(kis):
+                raise Exception("The input CSI must be vectors.");
+            p = his.shape[-1];
+            if p != lis.shape[-1] and p != kis.shape[-1]:
+                raise Exception("The input CSI (gains, delays and dopplers) must have the same length.");
+        else:
+            p = self.taps_num;
+            his = self.chan_coef;
+            lis = self.delay_taps;
+            kis = self.doppler_taps;
+        # build the channel
+        if self.pulse_type == self.PULSE_IDEAL:
+            H_DD = self.buildIdealChannel(p, his, lis, kis);
+        elif self.pulse_type == self.PULSE_RECTA:
+            H_DD = self.buildRectaChannel(p, his, lis, kis);
+        # remove the channel for PG & CE
+        if data_only:
+            H_DD = self.removeNoDAChannel(H_DD);
+            
+    '''
+    get the channel state information
+    @sort_by_gain: sort axis
+    @sort_by_delay_doppler: sort axes
+    @sort_by_doppler_delay: sort axes
+    @descend: sort direction
+    '''
+    def getCSI(self, *, sort_by_gain=False, sort_by_delay_doppler=False, sort_by_doppler_delay=False, descend=False):
+        # input check
+        if sort_by_gain + sort_by_delay_doppler + sort_by_doppler_delay > 1:
+            raise Exception("Cannot sort following over two orders.");
+        
+        # retrieve CSI
+        his = self.chan_coef;
+        lis = self.delay_taps;
+        kis = self.doppler_taps;
+        # TODO: sort
+        return his, lis, kis;
+    
+    '''
+    get the signal in the TF domain
+    '''
+    def getXTF(self):
+        return self.X_TF;
+    
+    '''
+    get the signal in the time domain
+    '''
+    def getXT(self, *, fft_size=None):
+        s = None;
+        # if fft resolution is lower than subcarrier number, we choose the subcarrier number as the resolution
+        if fft_size < self.nSubcarNum:
+            s = self.s;
+        else:
+            # Heisenberg transform
+            s_mat = ifft(self.X_TF, n=fft_size, axis=-2)*np.sqrt(self.nSubcarNum);
+            # vectorize
+            s = self.reshape(s_mat, self.nSubcarNum*self.nTimeslotNum, order='F');
+        return s;
+    
+    ###########################################################################
     # private methods
     '''
     shuffle and select top n elements' indices 
@@ -321,6 +395,38 @@ class OTFS(MatlabFuncHelper):
                 s_chan_rm_mat = s_chan_mat[..., self.cp_len:self.cp_len+self.nSubcarNum, :];
             s_chan_rm = self.reshape(s_chan_rm_mat, self.sig_len, order="F");
         return s_chan_rm;
+    
+    '''
+    remove non-data from DD channel
+    @H_DD: the DD channel from
+    '''
+    def removeNoDAChannel(self, H_DD):
+        #TODO: remove zero padding area
+        nans = self.nan(self.sig_len);
+        pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end = self.rg.getAreaPG();
+        ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end = self.rg.getAreaCE();
+        # mark redundant values - columns (PG area)
+        if pg_num > 0:
+            for doppl_id in range(pg_doppl_beg, pg_doppl_end+1):
+                for delay_id in range(pg_delay_beg, pg_delay_end+1):
+                    col_id = doppl_id*self.nSubcarNum + delay_id;
+                    H_DD[..., :, col_id] = nans;
+        # mark redundant values - rows (CE area)
+        if ce_num > 0:
+            for doppl_id in range(ce_doppl_beg,ce_doppl_end+1):
+                for delay_id in range(ce_delay_beg,ce_delay_end+1):
+                    row_id = doppl_id*self.nSubcarNum + delay_id;
+                    H_DD[..., row_id, :] = nans;
+        # remove
+        # remove - columns
+        if pg_num > 0:
+            col_idx = self.sum(self.isnan(H_DD)) == self.sig_len;
+            H_DD = np.delete(H_DD, col_idx, axis=-1);
+        # remove - rows
+        if ce_num > 0:
+            row_idx = self.sum(self.isnan(H_DD), axis=-1) == (self.sig_len - pg_num);
+            H_DD = np.delete(H_DD, row_idx, axis=-2);
+        return H_DD;
     
     '''
     build the ideal pulse DD channel (callable after modulate)

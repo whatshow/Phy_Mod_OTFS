@@ -221,6 +221,8 @@ classdef OTFSDetector < handle
                 end
                 % Update probabilities for each c in p[d, c]
                 p_cj = zeros(self.N*self.M, self.constel_len);                     % Pc(aj): the probability that x[c] for each constel point
+                % eta_ec_lns = zeros(self.M*self.N*self.p, self.constel_len); % debug
+                % eta_ec_lns_id = 1; % debug
                 for l=1:1:self.M
                     for k=1:1:self.N
                         c = self.N*(l-1)+k;
@@ -261,6 +263,8 @@ classdef OTFSDetector < handle
                                 eta_ec_ln(i2) = -(abs(Y_DD(e_k, e_l)- mu_dc(self.N*(e_l-1)+e_k,p_id) - e_h*self.constel(i2))^2)/sigma2_dc(self.N*(e_l-1)+e_k,p_id);
                             end
                             eta_ec_ln = eta_ec_ln - max(eta_ec_ln);     % subtract the maximal exponenet of ln(eta(e,c,k)) to keep mathematical stability
+                            % eta_ec_lns(eta_ec_lns_id, :) = eta_ec_ln.'; % debug
+                            % eta_ec_lns_id = eta_ec_lns_id+1; % debug
                             % calculate the probability that p[d, c] for the given d
                             pr_ecj_ln(p_id, :) = eta_ec_ln - log(sum(exp(eta_ec_ln)));
                         end
@@ -282,7 +286,6 @@ classdef OTFSDetector < handle
                             p_dc_val = p_dc_val/sum(p_dc_val);
                             p_dc(self.N*(e_l-1)+e_k,p_id,:) = p_dc_val*self.mp_base_delta_fra + (1-self.mp_base_delta_fra)*reshape(p_dc(self.N*(e_l-1)+e_k,p_id,:),1,self.constel_len);
                         end
-        
                     end
                 end
                 % early stop
