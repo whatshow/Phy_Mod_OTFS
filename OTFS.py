@@ -93,7 +93,7 @@ class OTFS(MatlabFuncHelper):
     @isAWGN:          use awgn
     @isRician:        use Rician fading
     '''
-    def setChannel(self, in1, in2, in3, *, force_frac=False, isAWGN=False, isRician=False):
+    def setChannel(self, in1, in2, in3, *, force_frac=False, isAWGN=False, isRician=False, isUniform=False):
         in1 = np.asarray(in1);
         in2 = np.asarray(in2);
         in3 = np.asarray(in3);

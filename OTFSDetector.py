@@ -140,7 +140,7 @@ class OTFSDetector(MatlabFuncHelper):
         if self.No is None or self.No.ndim != 0:
             raise Exception("The noise power must be a scalar.");
         # set data
-        conv_rate_prev = -0.1;
+        conv_rate_prev = -0.1 if self.batch_size == self.BATCH_SIZE_NO else np.tile(-0.1, self.batch_size);
         Y_DD = self.y_rg.getContent();
         pg_num, pg_l_beg, pg_l_end, pg_k_beg, pg_k_end = self.y_rg.getAreaPG();   # PG  
         ce_num, ce_l_beg, ce_l_end, ce_k_beg, ce_k_end = self.y_rg.getAreaCE();   # CE
@@ -168,22 +168,28 @@ class OTFSDetector(MatlabFuncHelper):
                         ki = self.kis[..., p_id];
                         # calculate coordinates for x[e]
                         e_l = l - li;
-                        if l < li:
-                            e_l = e_l + self.M;
+                        if self.batch_size == self.BATCH_SIZE_NO:
+                            if l < li:
+                                e_l = e_l + self.M;
+                        else:
+                            e_l[l < li] = e_l[l < li] + self.M;
                         e_k = np.mod(k - ki, self.N);
                         if self.y_rg.isPulseIdeal():
                             e_h = hi*np.exp(2j*pi*li/self.M*ki/self.N);
                         elif self.y_rg.isPulseRecta():
                             e_h = hi*np.exp(2j*pi*(l-li)/self.M*ki/self.N);
-                            if l < li:
-                                e_h = e_h*np.exp(-2j*pi*e_k/self.N);
+                            if self.batch_size == self.BATCH_SIZE_NO:
+                                if l < li:
+                                    e_h = e_h*np.exp(-2j*pi*e_k/self.N);
+                            else:
+                                e_h[l<li] = e_h[l<li]*np.exp(-2j*pi*e_k[l<li]/self.N);
                         # jump if x[e] in PG
                         if pg_num>0 and e_l>=pg_l_beg and e_l<=pg_l_end and e_k>=pg_k_beg and e_k <= pg_k_end:
                             continue;
                         # for the current x[c], we consider all constel points
                         for i2 in range(self.constel_len):
-                            mu_d[..., p_id] = mu_d[..., p_id] + p_dc[d,p_id,i2]*self.constel[i2];
-                            sigma2_d[..., p_id] = sigma2_d[..., p_id] + p_dc[d,p_id,i2]*abs(self.constel[i2])**2;
+                            mu_d[..., p_id] = mu_d[..., p_id] + p_dc[..., d,p_id,i2]*self.constel[i2];
+                            sigma2_d[..., p_id] = sigma2_d[..., p_id] + p_dc[..., d,p_id,i2]*abs(self.constel[i2])**2;
                         mu_d[..., p_id] = mu_d[..., p_id]*e_h;
                         sigma2_d[..., p_id] = sigma2_d[..., p_id]*abs(e_h)**2  - abs(mu_d[..., p_id])**2;
                     mu_d_sum = self.sum(mu_d);
@@ -212,53 +218,69 @@ class OTFSDetector(MatlabFuncHelper):
                         ki = self.kis[..., p_id];
                         # y[e] - calculate coordinates 
                         e_l = l + li;
-                        if l + li >= self.M:
-                            e_l = e_l - self.M;
+                        if self.batch_size == self.BATCH_SIZE_NO:
+                            if l + li >= self.M:
+                                e_l = e_l - self.M;
+                        else:
+                            e_l[l+li>=self.M] = e_l[l+li>=self.M] - self.M;
                         e_k = np.mod(k + ki, self.N);
                         if self.y_rg.isPulseIdeal():
                             e_h = hi*np.exp(2j*pi*li/self.M*ki/self.N);
                         elif self.y_rg.isPulseRecta():
-                            if l + li < self.M:
-                                e_h = hi*np.exp(2j*(pi/self.M)*l*ki/self.N);
+                            if self.batch_size == self.BATCH_SIZE_NO:
+                                if l + li < self.M:
+                                    e_h = hi*np.exp(2j*(pi/self.M)*l*ki/self.N);
+                                else:
+                                    e_h = hi*np.exp(2j*(pi/self.M)*(l-self.M)*ki/self.N)*np.exp(-2j*pi*k/self.N);
                             else:
-                                e_h = hi*np.exp(2j*(pi/self.M)*(l-self.M)*ki/self.N)*np.exp(-2j*pi*k/self.N);
+                                e_h = np.zeros(self.batch_size).astype(complex);
+                                e_h[l+li<self.M] = hi[l+li<self.M]*np.exp(2j*(pi/self.M)*l*ki[l+li<self.M]/self.N);
+                                e_h[l+li>=self.M] = hi[l+li>=self.M]*np.exp(2j*(pi/self.M)*(l-self.M)*ki[l+li>=self.M]/self.N)*np.exp(-2j*pi*k/self.N);
                         # y[e] - record coordinates
                         e_ls[..., p_id] = e_l;
                         e_ks[..., p_id] = e_k;
                         # calculate ln(eta(e,c,k)): the probability that x[c] takes a constel point(k) based on y[e]
                         eta_ec_ln = self.zeros(self.constel_len);               # ln(eta(e,c,k))
                         for i2 in range(self.constel_len):
-                            eta_ec_ln[...,i2] = np.real(-(abs(Y_DD[..., e_k, e_l]- mu_dc[...,self.N*e_l+e_k,p_id] - e_h*self.constel[i2])**2)/sigma2_dc[self.N*e_l+e_k,p_id]);
-                        eta_ec_ln = eta_ec_ln - self.max(eta_ec_ln);            # subtract the maximal exponenet of ln(eta(e,c,k)) to keep mathematical stability
+                            if self.batch_size == self.BATCH_SIZE_NO:
+                                eta_ec_ln[...,i2] = np.real(-(abs(Y_DD[..., e_k, e_l]- mu_dc[...,self.N*e_l+e_k,p_id] - e_h*self.constel[i2])**2)/sigma2_dc[..., self.N*e_l+e_k,p_id]);
+                            else:
+                                for b_id in range(self.batch_size):
+                                    eta_ec_ln[...,i2] = np.real(-(abs(Y_DD[..., e_k[b_id], e_l[b_id]]- mu_dc[...,self.N*e_l[b_id]+e_k[b_id],p_id] - e_h[b_id]*self.constel[i2])**2)/sigma2_dc[..., self.N*e_l[b_id]+e_k[b_id],p_id]);
+                        eta_ec_ln = eta_ec_ln - np.expand_dims(self.max(eta_ec_ln), axis=-1);   # subtract the maximal exponenet of ln(eta(e,c,k)) to keep mathematical stability
                         # eta_ec_lns[eta_ec_lns_id, :] = eta_ec_ln; # debug
                         # eta_ec_lns_id = eta_ec_lns_id+1;# debug
                         # calculate the probability that p[d, c] for the given d
-                        pr_ecj_ln[..., p_id, :] = eta_ec_ln - np.log(self.sum(np.exp(eta_ec_ln)));
+                        pr_ecj_ln[..., p_id, :] = eta_ec_ln - np.log(np.expand_dims(self.sum(np.exp(eta_ec_ln)), axis=-1));
                     # calculate sum(ln(Pr(y[e]|x[c]=aj, H))) for e in J(c)
-                    pr_cj_ln = self.zeros(1, self.constel_len);                 # sum(ln(Pr(y[e]|x[c]=aj, H)))
+                    pr_cj_ln = self.zeros(self.constel_len);                 # sum(ln(Pr(y[e]|x[c]=aj, H)))
                     for i2 in range(self.constel_len):
                         pr_cj_ln[..., i2] = self.sum(pr_ecj_ln[..., :,i2]);
                     # calculate p_cj = exp(pr_cj_ln)
-                    p_cj_all = np.exp(pr_cj_ln - self.max(pr_cj_ln));           # stay mathematical stability
-                    p_cj[..., c, :] = p_cj_all/self.sum(p_cj_all);              # normalise the sum of probability
+                    p_cj_all = np.exp(pr_cj_ln - np.expand_dims(self.max(pr_cj_ln), axis=-1));      # stay mathematical stability
+                    p_cj[..., c, :] = p_cj_all/np.expand_dims(self.sum(p_cj_all), axis=-1);         # normalise the sum of probability
                     # calculate p_dc
                     for p_id in range(self.p):
-                        e_l = e_ls[p_id];
-                        e_k = e_ks[p_id];
+                        e_l = e_ls[..., p_id];
+                        e_k = e_ks[..., p_id];
                         # remove ln(Pr(y[d]|x[c]=aj, H)) from sum(ln(Pr(y[e]|x[c]=aj, H)))
                         p_dc_val = pr_cj_ln - pr_ecj_ln[..., p_id,:];
-                        p_dc_val = np.exp(p_dc_val - self.max(p_dc_val));
-                        p_dc_val = p_dc_val/self.sum(p_dc_val);
-                        p_dc[..., self.N*e_l+e_k,p_id,:] = p_dc_val*self.mp_base_delta_fra + (1-self.mp_base_delta_fra)*self.reshape(p_dc[..., self.N*e_l+e_k,p_id,:],1,self.constel_len);
+                        p_dc_val = np.exp(p_dc_val - np.expand_dims(self.max(p_dc_val), axis=-1));
+                        p_dc_val = p_dc_val/np.expand_dims(self.sum(p_dc_val), axis=-1);
+                        if self.batch_size == self.BATCH_SIZE_NO:
+                            p_dc[..., self.N*e_l+e_k,p_id,:] = p_dc_val*self.mp_base_delta_fra + (1-self.mp_base_delta_fra)*p_dc[..., self.N*e_l+e_k,p_id,:];
+                        else:
+                            for b_id in range(self.batch_size):
+                                p_dc[..., self.N*e_l[b_id]+e_k[b_id],p_id,:] = p_dc_val*self.mp_base_delta_fra + (1-self.mp_base_delta_fra)*p_dc[..., self.N*e_l[b_id]+e_k[b_id],p_id,:];
             # early stop
-            conv_rate =  self.sum(self.max(p_cj)>0.99)/(self.N*self.M);
-            if conv_rate == 1:
+            conv_rate = self.sum(self.max(p_cj)>0.99)/(self.N*self.M);
+            if np.all(conv_rate == 1):
                 sum_prob_fin = p_cj;
                 break;
-            elif conv_rate > conv_rate_prev:
+            elif np.all(conv_rate > conv_rate_prev):
                 conv_rate_prev = conv_rate;
                 sum_prob_fin = p_cj;
-            elif (conv_rate < conv_rate_prev - 0.2) and conv_rate_prev > 0.95:
+            elif np.all(conv_rate < conv_rate_prev - 0.2) and np.all(conv_rate_prev > 0.95):
                 break;
         syms = self.zeros(self.M*self.N - pg_num).astype(complex);
         sym_id = 0;
@@ -267,7 +289,7 @@ class OTFSDetector(MatlabFuncHelper):
                 # jump if in PG area
                 if pg_num>0 and l>=pg_l_beg and l<=pg_l_end and k>=pg_k_beg and k <= pg_k_end:
                     continue;
-                pos = sum_prob_fin[self.N*l+k,:].argmax(axis=-1);
-                syms[sym_id] = np.take(self.constel, pos);
+                pos = sum_prob_fin[..., self.N*l+k,:].argmax(axis=-1);
+                syms[..., sym_id] = np.take(self.constel, pos);
                 sym_id = sym_id + 1;
         return syms;
