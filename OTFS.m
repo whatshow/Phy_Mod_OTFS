@@ -10,6 +10,11 @@ classdef OTFS < handle
         CP_ONE_FRAM_SUB = 21;                        % one cp for each OTFS subframe
     end
     properties
+        % system
+        fc = 4;                                     % Carrier frequency (GHz)
+        fq_sp = 15;                                 % subcarrier spacing (kHz)
+        res_k = 0;                                  % resolution - Doppler (kHz)
+        res_l = 0;                                  % resolution - delay (ms)
         % RG infomation
         nSubcarNum {mustBeInteger}                  % subcarrier number
         nTimeslotNum {mustBeInteger}                % timeslot number
@@ -38,6 +43,23 @@ classdef OTFS < handle
     % General Methods
     methods
         %{
+        constructor
+        @fc:        Carrier frequency (GHz)
+        @fq_sp:     subcarrier spacing (kHz)
+        %}
+        function self = OTFS(varargin)
+            % optional inputs - register
+            inPar = inputParser;
+            addParameter(inPar,"fc", self.fc, @(x) isscalar(x)&isnumeric(x)); 
+            addParameter(inPar,"fq_sp", self.fq_sp, @(x) isscalar(x)&isnumeric(x)); 
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            self.fc = inPar.Results.fc;
+            self.fq_sp = inPar.Results.fq_sp;
+        end
+
+        %{
         modulate (use fast method by default)
         @rg:        an OTFS resource grid
         @isFast:    DD domain -> TD domain (no X_TF) 
@@ -56,6 +78,7 @@ classdef OTFS < handle
             end
             % load RG
             [self.nSubcarNum, self.nTimeslotNum] = rg.getContentSize();
+            self.calcRes();
             self.sig_len = self.nSubcarNum*self.nTimeslotNum;
             if rg.isPulseIdeal()
                 self.pulse_type = self.PULSE_IDEAL;
@@ -421,6 +444,14 @@ classdef OTFS < handle
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % private methods
     methods(Access=private)
+        %{
+        calculate the resolution
+        %}
+        function calcRes(self)
+            self.res_k = self.fq_sp/self.nTimeslotNum;
+            self.res_l = 1/self.fq_sp/self.nTimeslotNum;
+        end
+
         %{
         shuffle and select top n elements' indices 
         %}

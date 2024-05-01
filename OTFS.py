@@ -17,6 +17,11 @@ class OTFS(MatlabFuncHelper):
     CP_ONE_FRAM_SUB = 21;                        # one cp for each OTFS subframe
     
     ###########################################################################
+    # system
+    fc = 4;                                      # Carrier frequency (GHz)
+    fq_sp = 15;                                  # subcarrier spacing (kHz)
+    res_k = 0;                                   # resolution - Doppler (kHz)
+    res_l = 0;                                   # resolution - delay (ms)
     # RG infomation
     nSubcarNum = None;                           # subcarrier number
     nTimeslotNum = None;                         # timeslot number
@@ -46,8 +51,13 @@ class OTFS(MatlabFuncHelper):
     constructor
     @batch_size: batch size
     '''
-    def __init__(self, *, batch_size=None):
-        self.batch_size = batch_size;
+    def __init__(self, *, fc=None, fq_sp=None, batch_size=None):
+        if fc is not None:
+            self.fc = fc;
+        if fq_sp is not None:
+            self.fq_sp = fq_sp;
+        if batch_size is not None:
+            self.batch_size = batch_size;
     
     '''
     modulate (use fast method by default)
@@ -59,6 +69,7 @@ class OTFS(MatlabFuncHelper):
             raise Exception("The input must be an OTFS resource grid.");
         # load RG
         self.nSubcarNum, self.nTimeslotNum = rg.getContentSize();
+        self.calcRes();
         self.sig_len = self.nSubcarNum*self.nTimeslotNum;
         if rg.isPulseIdeal():
             self.pulse_type = self.PULSE_IDEAL;
@@ -337,6 +348,13 @@ class OTFS(MatlabFuncHelper):
     
     ###########################################################################
     # private methods
+    '''
+    calculate the resolution
+    '''
+    def calcRes(self):
+        self.res_k = self.fq_sp/self.nTimeslotNum;
+        self.res_l = 1/self.fq_sp/self.nTimeslotNum;
+    
     '''
     shuffle and select top n elements' indices 
     '''
