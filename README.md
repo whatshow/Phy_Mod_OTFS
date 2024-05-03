@@ -244,16 +244,19 @@ All codes are uniform in matlab and python in three class.
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
-    * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
-    * `./CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
-    * `./OTFS`: test `OTFS` class
-    * `./RG`: test `OTFSResGrid` class
-    * `test_ce_getcsi`: test `getCSI()` using `sort`
-    * `test_ce_detect_*`: test channel estimation and detection together
-    * `test_ch_*`: test the channel functions for `OTFS`
-    * `test_detect_mp`: test MP detection methods
-    * `test_wf` & `test_wf_*`: test waveforms
-* TestFractionalDoppler
+    * `./Modular_OTFS`: test `OTFS` class
+    * `./Modular_OTFSDetector`: test `OTFSResGrid` class
+    * `./Modular_OTFSResGrid`: test `OTFSResGrid` class
+    * `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
+    * `./Whole_CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
+    * `./Whole_Joint`
+        * `case01`: rectangular pulse + full guards + single pilot
+    <!--* `test_ce_getcsi`: test `getCSI()` using `sort`-->
+    <!--* `test_ce_detect_*`: test channel estimation and detection together-->
+    <!--* `test_ch_*`: test the channel functions for `OTFS`-->
+    <!--* `test_detect_mp`: test MP detection methods-->
+    <!--* `test_wf` & `test_wf_*`: test waveforms-->
+<!--* TestFractionalDoppler-->
 * `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
 * `Viterbo_MP_Embed`: examples showing how MP detects symbols using embedded pilots.
 * `WaveForm`: this is to observe the waveform of OTFS.
