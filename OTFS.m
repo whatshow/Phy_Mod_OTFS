@@ -663,8 +663,7 @@ classdef OTFS < handle
                 % delay
                 piMati = circshift(piMat, li); 
                 % Doppler
-                %deltaMat_diag = exp(2j*pi*ki/(self.sig_len)*[0:self.sig_len-1-li, -li:-1]);
-                deltaMat_diag = exp(2j*pi*ki/(self.sig_len)*[0:self.sig_len-1]);
+                deltaMat_diag = exp(2j*pi*ki/(self.sig_len)*self.buildTimeSequence(li));
                 deltaMati = diag(deltaMat_diag);
                 % Pi, Qi, & Ti
                 Pi = kron(dftmat, eye(self.nSubcarNum))*piMati; 
@@ -672,6 +671,13 @@ classdef OTFS < handle
                 Ti = Pi*Qi;
                 H_DD = H_DD + hi*Ti;
             end
+        end
+
+        %{
+        build the time sequence for the given delay
+        %}
+        function ts = buildTimeSequence(self, li)
+            ts = [0:self.sig_len-1-li, -li:-1];
         end
     end
 end

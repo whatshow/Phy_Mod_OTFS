@@ -513,7 +513,7 @@ class OTFS(MatlabFuncHelper):
             # delay
             piMati = self.circshift(piMat, li);
             # Doppler            
-            deltaMat_diag = np.exp(2j*np.pi*ki/(self.sig_len)*self.seq(self.sig_len));
+            deltaMat_diag = np.exp(2j*np.pi*ki/(self.sig_len)*self.buildTimeSequence(li));
             deltaMati = self.diag(deltaMat_diag);
             # Pi, Qi & Ti
             Pi = self.kron(dftmat, self.eye(self.nSubcarNum)) @ piMati;
@@ -525,3 +525,19 @@ class OTFS(MatlabFuncHelper):
             else:
                 H_DD = H_DD + hi.reshape(-1, 1, 1)*Ti;
         return H_DD;
+    
+    '''
+    build the time sequence for the given delay
+    '''
+    def buildTimeSequence(self, li):
+        if self.batch_size is self.BATCH_SIZE_NO:
+            ts = np.append(np.arange(0, self.sig_len-li), np.arange(-li, 0));
+        else:
+            if np.all(li == li[0]):
+                ts = np.append(np.arange(0, self.sig_len-li[0]), np.arange(-li[0], 0));
+                ts = np.tile(ts, (self.batch_size, 1));
+            else:
+                ts = np.zeros((self.batch_size, self.sig_len), dtype=float);
+                for batch_id in range(self.batch_size):
+                    ts[batch_id, :] = np.append(np.arange(0, self.sig_len-li[batch_id]), np.arange(-li[batch_id], 0));
+        return ts;

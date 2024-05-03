@@ -243,7 +243,6 @@ All codes are uniform in matlab and python in three class.
     
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
-* `MP_Embed`: examples showing how MP detects symbols using embedded pilots.
 * `Tests`
     * `./CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
     * `./CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
@@ -256,6 +255,7 @@ Before running any sample code, please make sure you are at the root path of thi
     * `test_wf` & `test_wf_*`: test waveforms
 * TestFractionalDoppler
 * `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
+* `Viterbo_MP_Embed`: examples showing how MP detects symbols using embedded pilots.
 * `WaveForm`: this is to observe the waveform of OTFS.
 
 ## TODO
