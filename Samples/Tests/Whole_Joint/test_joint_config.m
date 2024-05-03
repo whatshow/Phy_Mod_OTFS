@@ -1,13 +1,13 @@
 % OTFS
 fc = 4;                 % GHz
 freq_sp = 15;           % kHz
-M = 64;                 % time slot
+M = 32;                 % time slot
 N = 16;                 % subcarrier
 % speed
 vs = [30, 120, 500];    % km/h
 fd = vs/3.6/physconst('LightSpeed')*fc*1e6; % Doppler shift (kHz)
 kmaxs = fd/(freq_sp/N);
-lmaxs = 3*ones(length(kmaxs), 1);
+lmaxs = 4*ones(length(kmaxs), 1);
 % SNR range
 SNR_ds = 10:2:18;       % dB
 SNR_ps = 25:5:50;       % dB

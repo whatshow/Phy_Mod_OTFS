@@ -7,13 +7,12 @@ p = 9;
 lmax = lmaxs(1);
 kmax = kmaxs(end);
 % data powers
-SNR_ps = SNR_ps - SNR_ps(1);
 SNR_d = SNR_ds(end);
 pow_sig = 1;                                % signal power
 pow_pils = 10.^((SNR_ps - SNR_d)/10);       % pilot power
 No = 10.^(-SNR_d/10);                       % noise power
 pow_thr = 3*sqrt(No);                       % threshold
-N_Frams = 1e6*ones(length(pow_pils), 1);
+N_Frams = 1e4*ones(length(pow_pils), 1);
 path_file = path_folder + "test_joint_case001" + ".mat";
 
 %% simulations
