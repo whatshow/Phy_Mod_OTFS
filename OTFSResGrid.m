@@ -203,7 +203,6 @@ classdef OTFSResGrid < handle
                 end
                 ins(1) = floor((self.nSubcarNum - self.pl_len)/2);
                 ins(2) = self.nSubcarNum - self.pl_len - ins(1);
-                
             end
             if self.gk_len_ful
                 ins(3) = floor((self.nTimeslotNum - self.pk_len)/2);

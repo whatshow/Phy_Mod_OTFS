@@ -250,7 +250,7 @@ Before running any sample code, please make sure you are at the root path of thi
     * `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
     * `./Whole_CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
     * `./Whole_Joint`
-        * `case01`: rectangular pulse + full guards + single pilot
+        * `case001`: rectangular pulse + full guards + single pilot; NMSE
     <!--* `test_ce_getcsi`: test `getCSI()` using `sort`-->
     <!--* `test_ce_detect_*`: test channel estimation and detection together-->
     <!--* `test_ch_*`: test the channel functions for `OTFS`-->
