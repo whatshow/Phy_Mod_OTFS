@@ -7,6 +7,7 @@ p = 9;
 lmax = lmaxs(1);
 kmax = kmaxs(end);
 % data powers
+SNR_ps = SNR_ps - SNR_ps(1);
 SNR_d = SNR_ds(end);
 pow_sig = 1;                                % signal power
 pow_pils = 10.^((SNR_ps - SNR_d)/10);       % pilot power
@@ -28,7 +29,7 @@ for idx = 1:length(SNR_ps)
     %
     tmp_H_NMSE = zeros(N_Fram, 1);
     tmp_H_NMSE2 = zeros(N_Fram, 1);
-    parfor i_Fram = N_Fram
+    parfor i_Fram = 1:N_Fram
         % build RG
         data_temp = randi([0 1], N_bits_perfram, 1);
         xDD = qammod(data_temp, M_mod, 'InputType', 'bit', 'UnitAveragePower', true);
