@@ -1,40 +1,11 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration file="D:\Projects\Github_Whatshow\Phy_Mod_OTFS\build.prj" location="D:\Projects\Github_Whatshow\Phy_Mod_OTFS" name="build" target="target.toolbox" target-name="Package Toolbox">
+  <configuration build-checksum="201869042" file="D:\Projects\Github_Whatshow\Phy_Mod_OTFS\build.prj" location="D:\Projects\Github_Whatshow\Phy_Mod_OTFS" name="build" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>whatshow_phy_mod_otfs</param.appname>
     <param.authnamewatermark>whatshow</param.authnamewatermark>
     <param.email>wfwfpwefe2323@gmail.com</param.email>
     <param.company />
-    <param.summary>This repository is a fundamental toolbox of OTFS modulation.</param.summary>
-    <param.description>This section will illustrate the methods of this class following the process from Tx to Rx.
-1. OTFS
-@nSubcarNum: the subcarrier number
-@nTimeslotNum: the timeslot number
-@batch_size(optional) : the batch size (only used in python).
-nSubcarNum = 16;
-nTimeslotNum = 7;
-otfs = OTFS(nSubcarNum, nTimeslotNum);
-2. modulate
-@symbols: a vector of [(batch_size), nSubcarNum*nTimeslotNum], or a matrix in delay Doppler domain [(batch_size), Doppler, delay] or [(batch_size), nTimeslotNum ,nSubcarNum]
-otfs.modulate(x_origin);
-3. setChannel (this methods has 2 kinds of inputs)
-3.1 generate random channel: If we use batch, the channel will be different for each sample in the batch. 
-@p: the path number (scalar)
-@lmax: the maximal integer delay index (scalar)
-@kmax: the maximal integer Doppler index (scalar). If set to a float number, we use fractional Doppler
-otfs.setChannel("p", 6, "lmax", 11, "kmax", 3);
-3.2 generate fixed channel
-@gains: the channel gains of [(batch_size), p]
-@delays: the channel delays of [(batch_size), p]
-@dopplers: the channel Doppler shift of [(batch_size), p]
-otfs.setChannel("delays", [0, 1], "Dopplers", [2, 3], "gains", [0.5, 0.5]);
-4. getChannel: return the Delay-Doppler domain channel matrix of [(batch_size), nSubcarNumnTimeslotNum, nSubcarNumnTimeslotNum]
-H_DD = otfs.getChannel();
-5. passChannel
-@No: a scalar of the linear noise power# matlab &amp; python
-otfs.passChannel(No);
-6. demodulate
-return value: the vectorized received signal in the delay Doppler domain, a vector of [(batch_size), nSubcarNum*nTimeslotNum]
-yDD = otfs.demodulate();</param.description>
+    <param.summary>OTFS Modulation</param.summary>
+    <param.description>This repository is a fundamental toolbox of OTFS modulation crossing matlab and python. Please check the project on Github for how to use.</param.description>
     <param.screenshot />
     <param.version>2.1.1</param.version>
     <param.output>${PROJECT_ROOT}\whatshow_phy_mod_otfs.mltbx</param.output>
@@ -74,6 +45,17 @@ init.m
       <item>/Samples/TestOTFSAllFunctions</item>
       <item>/Samples/TestWaveForms</item>
       <item>/Samples/Viterbo_MP_2018</item>
+      <item>/Samples/Obsolete</item>
+      <item>/Samples/Obsolete/TestFractionalDoppler</item>
+      <item>/Samples/Tests</item>
+      <item>/Samples/Tests/Modular_OTFS</item>
+      <item>/Samples/Tests/Modular_OTFSDetector</item>
+      <item>/Samples/Tests/Modular_OTFSResGrid</item>
+      <item>/Samples/Tests/Whole_CE</item>
+      <item>/Samples/Tests/Whole_CE_Detect</item>
+      <item>/Samples/Tests/Whole_Joint</item>
+      <item>/Samples/Viterbo_MP_Embed</item>
+      <item>/Samples/WaveForm</item>
     </param.matlabpath.excludes>
     <param.javaclasspath.excludes />
     <param.exported.on.package>false</param.exported.on.package>
@@ -94,6 +76,8 @@ init.m
     <param.additional.sw.mac.url />
     <param.additional.sw.linux.url />
     <unset>
+      <param.authnamewatermark />
+      <param.email />
       <param.company />
       <param.screenshot />
       <param.output />
