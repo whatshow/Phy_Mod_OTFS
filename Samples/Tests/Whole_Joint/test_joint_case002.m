@@ -13,7 +13,7 @@ pow_pils = 10.^((SNR_ps - SNR_d)/10);       % pilot power
 No = 10.^(-SNR_d/10);                       % noise power
 pow_thr = 3*sqrt(No);                       % threshold
 N_Frams = 1e4*ones(length(pow_pils), 1);
-path_file = path_folder + "test_joint_case001" + ".mat";
+path_file = path_folder + "test_joint_case002" + ".mat";
 
 %% simulations
 SER = zeros(length(SNR_ps), 1);
@@ -55,37 +55,37 @@ for idx = 1:length(SNR_ps)
         % demapping (CE)
         [yDD, his_est, lis_est, kis_est] = rg_rx.demap("isData", false, "threshold", pow_thr);
         [yDD2, his_est2, lis_est2, kis_est2] = rg2_rx.demap("isData", false, "threshold", pow_thr);
-        % compare the channel
-        HDD = otfs.getChannel(his, lis, kis);
-        HDD_norm2 = sum(abs(HDD).^2, "all");
+        % detect
+        od = OTFSDetector(constel);
+        od.useMPBase();
         if isempty(his_est)
-            tmp_H_NMSE(i_Fram) = 1;
+            tmp_SER(i_Fram) = 1;
         else
-            HDD_est = otfs.getChannel(his_est, lis_est, kis_est);
-            tmp_H_NMSE(i_Fram) = ;
+            xDD_est = od.detect(rg_rx, his_est, lis_est, kis_est, No);
+            tmp_SER(i_Fram) = sum(abs(xDD_est - xDD) > eps)/N_syms_perfram;
         end
         if isempty(his_est2)
-            tmp_H_NMSE2(i_Fram) = 10*log10(HDD_norm2);
+            tmp_SER2(i_Fram) = 1;
         else
-            HDD_est2 = otfs.getChannel(his_est2, lis_est2, kis_est2);
-            tmp_H_NMSE2(i_Fram) = 10*log10(sum(abs(HDD-HDD_est2).^2, "all")/HDD_norm2);
+            xDD_est2 = od.detect(rg2_rx, his_est2, lis_est2, kis_est2, No);
+            tmp_SER2(i_Fram) = sum(abs(xDD_est2 - xDD) > eps)/N_syms_perfram;
         end
     end
-    H_NMSE(idx) = mean(tmp_H_NMSE);
-    H_NMSE2(idx) = mean(tmp_H_NMSE2);
+    SER(idx) = mean(tmp_SER);
+    SER2(idx) = mean(tmp_SER2);
 end
 %% save
 save(path_file);
 
 %% plot
-semilogy(SNR_ps, H_NMSE, "-s", "Color", "#D95319", "LineWidth", 4);
+semilogy(SNR_ps, SER, "-s", "Color", "#D95319", "LineWidth", 4);
 hold on;
-semilogy(SNR_ps, H_NMSE2, "--ob", "LineWidth", 2);
+semilogy(SNR_ps, SER2, "--ob", "LineWidth", 2);
 hold off;
 grid on;
 xlabel("Pilot SNR(dB)");
-ylabel("NMSE(dB)");
-ylim([min(H_NMSE2), max(H_NMSE)]);
+ylabel("SER(dB)");
+ylim([min(SER2), max(SER)]);
 xlim([min(SNR_ps), max(SNR_ps)]);
 legend('rect', 'ideal');
 title(string(M)+"x"+string(N)+", "+string(p)+" paths (Full Guard)")
