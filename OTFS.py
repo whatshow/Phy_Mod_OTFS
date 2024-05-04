@@ -28,6 +28,7 @@ class OTFS(MatlabFuncHelper):
     sig_len = 0;                                 # the total signal length
     rg = None
     # OTFS process signal
+    X_DD = None;
     X_TF = None                                  # Tx value in the time-frequency(TF) domain
     s  = None;                                   # Tx value in the time domain (array)
     H = None;                                    # channel in the time domain
@@ -60,35 +61,50 @@ class OTFS(MatlabFuncHelper):
             self.batch_size = batch_size;
     
     '''
+    pulse settings
+    '''
+    def setPulse2Ideal(self):
+        self.pulse_type = self.PULSE_IDEAL;
+    def setPulse2Recta(self):
+        self.pulse_type = self.PULSE_RECTA;
+    
+    '''
     modulate (use fast method by default)
-    @rg:        an OTFS resource grid
+    @in1:       an OTFS resource grid or a 2D matrix [Doppler, delay]
     @isFast:    DD domain -> TD domain (no X_TF) 
     '''
-    def modulate(self, rg, *, isFast=True):
-        if not isinstance(rg, OTFSResGrid):
-            raise Exception("The input must be an OTFS resource grid.");
-        # load RG
-        self.nSubcarNum, self.nTimeslotNum = rg.getContentSize();
-        self.calcRes();
-        self.sig_len = self.nSubcarNum*self.nTimeslotNum;
-        if rg.isPulseIdeal():
-            self.pulse_type = self.PULSE_IDEAL;
-        elif rg.isPulseRecta():
-            self.pulse_type = self.PULSE_RECTA;
+    def modulate(self, in1, *, isFast=True):
+        if isinstance(in1, OTFSResGrid):
+            # load RG
+            self.nSubcarNum, self.nTimeslotNum = in1.getContentSize();
+            self.calcRes();
+            self.sig_len = self.nSubcarNum*self.nTimeslotNum;
+            if in1.isPulseIdeal():
+                self.pulse_type = self.PULSE_IDEAL;
+            elif in1.isPulseRecta():
+                self.pulse_type = self.PULSE_RECTA;
+            else:
+                raise Exception("Pulse shaping is not given in the resource grid.");
+            self.rg = in1.clone();
+            self.X_DD = in1.getContent();
+        elif self.ismatrix(in1):
+            in1 = np.asarray(in1);
+            self.nTimeslotNum = in1.shape[-2];
+            self.nSubcarNum = in1.shape[-1];
+            self.sig_len = self.nSubcarNum*self.nTimeslotNum;
+            self.X_DD = in1;
         else:
-            raise Exception("Pulse shaping is not given in the resource grid.");
-        self.rg = rg.clone();
-        X_DD = self.rg.getContent();
+            raise Exception("The input must be an OTFS resource grid or a 2D matrix [(batch_size), Doppler, delay].");
         # modulate
         if self.pulse_type == self.PULSE_RECTA:
             if isFast:
-                s_mat = ifft(X_DD, axis=-2)*sqrt(self.nTimeslotNum);
-                self.s = self.reshape(s_mat, self.nSubcarNum*self.nTimeslotNum);
+                s_mat = ifft(self.X_DD, axis=-2)*sqrt(self.nTimeslotNum);
+                self.s = self.reshape(s_mat, self.sig_len);
             else:
                 X_FT = fft(ifft(self.X_DD, axis=-2), axis=-1)/sqrt(self.nSubcarNum/self.nTimeslotNum); # ISFFT 
                 self.X_TF = np.moveaxis(X_FT, -1, -2); # X_TF is [nSubcarNum, nTimeslotNum]
                 s_mat = ifft(self.X_TF, axis=-2)*sqrt(self.nSubcarNum); # Heisenberg transform
-                self.s = self.reshape(s_mat, self.nSubcarNum*self.nTimeslotNum, order='F');
+                self.s = self.reshape(s_mat, self.sig_len, order='F');
 
     '''
     set channel (in1, in2, in3)
@@ -143,7 +159,7 @@ class OTFS(MatlabFuncHelper):
             kmin = -kmax;
             taps_max = (kmax - kmin + 1)*(lmax - lmin + 1);
             # create delay options [lmin, lmin, lmin, lmin+1, lmin+1, lmin+1 ...]
-            l_combs = kron(np.arange(1, lmax + 1), np.ones((1, kmax - kmin + 1)));
+            l_combs = kron(np.arange(1, lmax + 1), np.ones((1, kmax - kmin + 1))).astype(int);
             # create Doppler options [kmin, kmin+1, kmin+2 ... kmax, kmin ...]
             k_combs = np.tile(np.arange(-kmax, kmax + 1), (1, lmax- lmin + 1));
             # select P paths from all possible paths
@@ -152,14 +168,14 @@ class OTFS(MatlabFuncHelper):
             self.delay_taps = np.take(l_combs, taps_selected_idx);
             self.delay_taps[..., np.argmin(self.delay_taps, -1)] = 0;
             # CSI - doppler
-            self.doppler_taps = k_combs(taps_selected_idx);
+            self.doppler_taps = np.take(k_combs, taps_selected_idx);
             # add fractional Doppler
             if force_frac:
                 doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
                 doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                 doppler_taps_k_other_idx = abs(self.doppler_taps) != kmax;
-                frac_range_max_pos = self.rand(p)*(kmax_frac - kmax + 0.5) - 0.5;
-                frac_range_max_neg = self.rand(p)*(kmax - kmax_frac - 0.5) + 0.5;
+                frac_range_max_pos = self.rand(p)*(kmax_frac+0.5)-0.5;
+                frac_range_max_neg = self.rand(p)*(-kmax_frac-0.5)+0.5;
                 frac_range_others = self.rand(p) - 0.5;
                 frac_range_all = frac_range_max_pos*doppler_taps_k_max_pos_idx + frac_range_max_neg*doppler_taps_k_max_neg_idx + frac_range_others*doppler_taps_k_other_idx;
                 self.doppler_taps = self.doppler_taps + frac_range_all;
@@ -218,7 +234,7 @@ class OTFS(MatlabFuncHelper):
         s_chan = 0;
         if self.pulse_type == self.PULSE_IDEAL:
             H_DD = self.buildIdealChannel(self.taps_num, self.chan_coef, self.delay_taps, self.doppler_taps);
-            s_chan = H_DD @ np.expand_dims(self.rg.getContent(isVector=True), -1);
+            s_chan = H_DD @ self.reshape(self.X_DD, self.sig_len, 1);
         elif self.pulse_type == self.PULSE_RECTA:
             s_cp, s_cp_t = self.addCP();
             for tap_id in range(self.taps_num):
@@ -268,9 +284,12 @@ class OTFS(MatlabFuncHelper):
                 self.Y_TF = fft(r_mat, axis=-2)/sqrt(self.nSubcarNum);
                 Y_FT = np.moveaxis(self.Y_TF, -1, -2);
                 # SFFT (Y_DD in [Doppler, delay] or [nTimeslotNum ,nSubcarNum])
-                self.Y_DD = ifft(fft(Y_FT, axis=-2), axis=-1)/sqrt(self.nTimeslotNum/self.nSubcarNum); 
-        self.rg.setContent(self.Y_DD);
-        return self.rg;
+                self.Y_DD = ifft(fft(Y_FT, axis=-2), axis=-1)/sqrt(self.nTimeslotNum/self.nSubcarNum);
+        if self.rg is None:
+            return self.Y_DD;
+        else:
+            self.rg.setContent(self.Y_DD);
+            return self.rg;
     
     ###########################################################################
     # Getters & Setters
@@ -303,8 +322,9 @@ class OTFS(MatlabFuncHelper):
         elif self.pulse_type == self.PULSE_RECTA:
             H_DD = self.buildRectaChannel(p, his, lis, kis);
         # remove the channel for PG & CE
-        if data_only:
+        if data_only and self.rg is not None:
             H_DD = self.removeNoDAChannel(H_DD);
+        return H_DD;
             
     '''
     get the channel state information
@@ -343,7 +363,7 @@ class OTFS(MatlabFuncHelper):
             # Heisenberg transform
             s_mat = ifft(self.X_TF, n=fft_size, axis=-2)*np.sqrt(self.nSubcarNum);
             # vectorize
-            s = self.reshape(s_mat, self.nSubcarNum*self.nTimeslotNum, order='F');
+            s = self.reshape(s_mat, self.sig_len, order='F');
         return s;
     
     ###########################################################################
@@ -419,6 +439,9 @@ class OTFS(MatlabFuncHelper):
     @H_DD: the DD channel from
     '''
     def removeNoDAChannel(self, H_DD):
+        if self.rg is None:
+            raise Exception("The resource grid is not given.");
+        
         #TODO: remove zero padding area
         nans = self.nan(self.sig_len);
         pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end = self.rg.getAreaPG();

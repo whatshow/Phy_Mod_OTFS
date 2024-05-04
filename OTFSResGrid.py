@@ -349,8 +349,7 @@ class OTFSResGrid(MatlabFuncHelper):
     def getContent(self, *, isVector=False):
         # return
         if isVector:
-            content = self.content.copy();
-            content = self.reshape(content, self.nSubcarNum*self.nTimeslotNum);
+            content = self.reshape(self.content, self.nSubcarNum*self.nTimeslotNum);
         else:
             content = self.content;
         return content;

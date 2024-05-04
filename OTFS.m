@@ -21,6 +21,7 @@ classdef OTFS < handle
         sig_len = 0;                                % the total signal length
         rg
         % OTFS process signal
+        X_DD
         X_TF                                        % Tx value in the time-frequency(TF) domain
         s                                           % Tx value in the time domain (array)
         H                                           % channel in the time domain
@@ -60,11 +61,21 @@ classdef OTFS < handle
         end
 
         %{
+        pulse settings
+        %}
+        function setPulse2Ideal(self)
+            self.pulse_type = self.PULSE_IDEAL;
+        end
+        function setPulse2Recta(self)
+            self.pulse_type = self.PULSE_RECTA;
+        end
+
+        %{
         modulate (use fast method by default)
-        @rg:        an OTFS resource grid
+        @in1:       an OTFS resource grid or a 2D matrix [(batch_size), Doppler, delay]
         @isFast:    DD domain -> TD domain (no X_TF) 
         %}
-        function modulate(self, rg, varargin)
+        function modulate(self, in1, varargin)
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar,"isFast", true, @(x) isscalar(x)&islogical(x)); 
@@ -73,29 +84,35 @@ classdef OTFS < handle
             parse(inPar, varargin{:});
             isFast = inPar.Results.isFast;
             % input check
-            if ~isa(rg, 'OTFSResGrid')
-                error("The input must be an OTFS resource grid.");
-            end
-            % load RG
-            [self.nSubcarNum, self.nTimeslotNum] = rg.getContentSize();
-            self.calcRes();
-            self.sig_len = self.nSubcarNum*self.nTimeslotNum;
-            if rg.isPulseIdeal()
-                self.pulse_type = self.PULSE_IDEAL;
-            elseif rg.isPulseRecta()
-                self.pulse_type = self.PULSE_RECTA;
+            if isa(in1, 'OTFSResGrid')
+                % load RG
+                [self.nSubcarNum, self.nTimeslotNum] = in1.getContentSize();
+                self.calcRes();
+                self.sig_len = self.nSubcarNum*self.nTimeslotNum;
+                if in1.isPulseIdeal()
+                    self.pulse_type = self.PULSE_IDEAL;
+                elseif in1.isPulseRecta()
+                    self.pulse_type = self.PULSE_RECTA;
+                else
+                    error("Pulse shaping is not given in the resource grid.");
+                end
+                self.rg = in1.clone();
+                self.X_DD = in1.getContent();
+            elseif ismatrix(in1)
+                [self.nTimeslotNum, self.nSubcarNum] = size(in1);
+                self.sig_len = self.nSubcarNum*self.nTimeslotNum;
+                self.X_DD = in1;
             else
-                error("Pulse shaping is not given in the resource grid.");
+                error("The input must be an OTFS resource grid or a 2D matrix [(batch_size), Doppler, delay].");
             end
-            self.rg = rg.clone();
-            X_DD = self.rg.getContent();
+            
             % modulate
             if self.pulse_type == self.PULSE_RECTA
                 if isFast
-                    s_mat = ifft(X_DD).'*sqrt(self.nTimeslotNum);
+                    s_mat = ifft(self.X_DD).'*sqrt(self.nTimeslotNum);
                     self.s = s_mat(:);
                 else
-                    X_FT = fft(ifft(X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum); % ISFFT 
+                    X_FT = fft(ifft(self.X_DD).').'/sqrt(self.nSubcarNum/self.nTimeslotNum); % ISFFT 
                     self.X_TF = X_FT.'; % X_TF is [nSubcarNum, nTimeslotNum]
                     s_mat = ifft(self.X_TF)*sqrt(self.nSubcarNum); % Heisenberg transform
                     self.s = s_mat(:);
@@ -183,8 +200,8 @@ classdef OTFS < handle
                     doppler_taps_k_max_pos_idx = self.doppler_taps == kmax;
                     doppler_taps_k_max_neg_idx = self.doppler_taps == -kmax;
                     doppler_taps_k_other_idx = abs(self.doppler_taps)~= kmax;
-                    frac_range_max_pos = rand(1, p)*(kmax_frac - kmax + 0.5) - 0.5;
-                    frac_range_max_neg = rand(1, p)*(kmax - kmax_frac - 0.5) + 0.5;
+                    frac_range_max_pos = rand(1, p)*(kmax_frac+0.5)-0.5;
+                    frac_range_max_neg = rand(1, p)*(-kmax_frac-0.5)+0.5;
                     frac_range_others = rand(1, p) - 0.5;
                     frac_range_all = frac_range_max_pos.*doppler_taps_k_max_pos_idx + frac_range_max_neg.*doppler_taps_k_max_neg_idx + frac_range_others.*doppler_taps_k_other_idx;
                     self.doppler_taps = self.doppler_taps + frac_range_all;
@@ -251,7 +268,7 @@ classdef OTFS < handle
             s_chan = 0;
             if self.pulse_type == self.PULSE_IDEAL
                 H_DD = self.buildIdealChannel(self.taps_num, self.chan_coef, self.delay_taps, self.doppler_taps);
-                s_chan = H_DD*self.rg.getContent("isVector", true);
+                s_chan = H_DD*reshape(self.X_DD.', self.sig_len, 1);
             elseif self.pulse_type == self.PULSE_RECTA
                 [s_cp, s_cp_t] = self.addCP();
                 for tap_id = 1:self.taps_num
@@ -285,7 +302,7 @@ classdef OTFS < handle
         demodulate (use fast method by default)
         @isFast:    TD domain -> DD domain (no Y_TF) 
         %}
-        function rg = demodulate(self, varargin)
+        function ou1 = demodulate(self, varargin)
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar,"isFast", true, @(x) isscalar(x)&islogical(x)); 
@@ -306,8 +323,12 @@ classdef OTFS < handle
                     self.Y_DD = ifft(fft(Y_FT).').'/sqrt(self.nTimeslotNum/self.nSubcarNum);
                 end
             end
-            self.rg.setContent(self.Y_DD);
-            rg = self.rg;
+            if isempty(self.rg)
+                ou1 = self.Y_DD;
+            else
+                self.rg.setContent(self.Y_DD);
+                ou1 = self.rg;
+            end
         end
     end
     
@@ -358,7 +379,7 @@ classdef OTFS < handle
                 H_DD = self.buildRectaChannel(p, his, lis, kis);
             end
             % remove the channel for PG & CE
-            if data_only
+            if data_only && ~isempty(self.rg)
                 H_DD = self.removeNoDAChannel(H_DD);
             end
         end
@@ -466,10 +487,10 @@ classdef OTFS < handle
         function [s_cp, s_cp_t] = addCP(self)
             if self.cp_type == self.CP_ZERO
                 s_cp = self.s;
-                s_cp_t = (0:self.nSubcarNum*self.nTimeslotNum-1)';
+                s_cp_t = (0:self.sig_len-1)';
             elseif self.cp_type == self.CP_ONE_FRAM
                 s_cp = [self.s(end - self.cp_len + 1 : end);self.s];
-                s_cp_t = (-self.cp_len:self.nSubcarNum*self.nTimeslotNum-1)';
+                s_cp_t = (-self.cp_len:self.sig_len-1)';
             elseif self.cp_type == self.CP_ONE_FRAM_SUB
                 s_mat = reshape(self.s, self.nSubcarNum, self.nTimeslotNum);
                 s_mat = [s_mat(end - self.cp_len + 1 : end, :); s_mat];
@@ -572,6 +593,10 @@ classdef OTFS < handle
         @H_DD: the DD channel from
         %}
         function H_DD = removeNoDAChannel(self, H_DD)
+            if isempty(self.rg)
+                error("The resource grid is not given.");
+            end
+
             %TODO: remove zero padding area
             invalud_row = nan(1, self.sig_len);
             invalud_col = nan(self.sig_len, 1);

@@ -1,5 +1,5 @@
 # OTFS Modulation
-[![PyPi](https://img.shields.io/badge/PyPi-2.0.1-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.0.1-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
+[![PyPi](https://img.shields.io/badge/PyPi-2.1.1-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.1-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
 
 This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`. This repositiory is based on papers below:
 > Raviteja, P., Phan, K. T., Hong, Y., & Viterbo, E. (2018). Interference cancellation and iterative detection for orthogonal time frequency space modulation. *IEEE transactions on wireless communications, 17(10)*, 6501-6515.
@@ -147,8 +147,13 @@ All codes are uniform in matlab and python in three class.
 * OTFS: this class provides the entire process of OTFS from Tx to Rx
     * OTFS()<br>
         `@batch_size(opt)`: the batch size (only used in python)
+    * Pulse settings: if you want to input delay-Doppler domain matrix directly into `OTFS`, you need to set the pulse type before `modulate`.
+        ```c, matlab, python
+        otfs.setPulse2Ideal();  // use ideal pulses
+        otfs.setPulse2Recta();  // use rectangular pulses
+        ```
     * modulate():modulate (use fast method by default)<br>
-        `@rg`: an OTFS resource grid<br>
+        `@in1`: an OTFS resource grid or a 2D matrix [(batch_size), Doppler, delay]<br>
         `@isFast(opt)`: DD domain -> TD domain (no X_TF)
         ```c, matlab, python
         // fast modulate
@@ -191,7 +196,8 @@ All codes are uniform in matlab and python in three class.
     * demodulate(): demodulate (use fast method by default)<br>
         `@isFast(opt)`: TD domain -> DD domain (no Y_TF) 
         ```c, matlab, python
-        rg = otfs.demodulate();
+        rg = otfs.demodulate(); // if the modulation uses a resource grid
+        Y_DD = otfs.demodulate(); // if the modulation uses a delay-Doppler domain matrix
         ```
     * getChannel(): return the channel on delay Doppler domain. If not given `his`, `lis`, `kis`, use the current channel.<br>
         `@his`: the channel gains<br>
@@ -245,6 +251,7 @@ All codes are uniform in matlab and python in three class.
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
     * `./Modular_OTFS`: test `OTFS` class
+        * `case001:` test the light mode (integer and fractional Dopplers. ideal and rectangular pulses)
     * `./Modular_OTFSDetector`: test `OTFSResGrid` class
     * `./Modular_OTFSResGrid`: test `OTFSResGrid` class
     * `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
