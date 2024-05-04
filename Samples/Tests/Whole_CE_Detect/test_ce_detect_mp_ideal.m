@@ -41,7 +41,7 @@ sympool = qammod(0: M_mod-1, M_mod, 'UnitAveragePower',true);
 N_syms_perfram = N*M-(pilots_num_delay+guard_delay_num_neg+guard_delay_num_pos)*N;
 N_bits_perfram = N_syms_perfram*M_bits;
 % Monte Carlo
-N_Frams = 1e6*ones(length(SNR_ds), 1);
+N_Frams = 3e4*ones(length(SNR_ds), 1);
 
 %% simulations
 SERs_PerCSI = zeros(length(SNR_ds), 1);
@@ -55,7 +55,7 @@ for SNR_d_id = 1:length(SNR_ds)
     N_Fram = N_Frams(SNR_d_id);
     tmp_SERs_PerCSI = zeros(N_Fram, 1);
     tmpSERs_CE = zeros(N_Fram, 1);
-    parfor i_Fram = N_Fram
+    parfor i_Fram = 1:N_Fram
         % build RG
         data_temp = randi([0 1], N_bits_perfram, 1);
         xDD = qammod(data_temp, M_mod, 'InputType', 'bit', 'UnitAveragePower', true);
