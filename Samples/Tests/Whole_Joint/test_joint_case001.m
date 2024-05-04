@@ -85,7 +85,7 @@ hold off;
 grid on;
 xlabel("Pilot SNR(dB)");
 ylabel("NMSE(dB)");
-ylim([min(H_NMSE), max(H_NMSE)]);
+ylim([min(H_NMSE2), max(H_NMSE)]);
 xlim([min(SNR_ps), max(SNR_ps)]);
 legend('rect', 'ideal');
 title(string(M)+"x"+string(N)+", "+string(p)+" paths (Full Guard)")
