@@ -12,7 +12,7 @@ pow_sig = 1;                                % signal power
 pow_pils = 10.^((SNR_ps - SNR_d)/10);       % pilot power
 No = 10.^(-SNR_d/10);                       % noise power
 pow_thr = 3*sqrt(No);                       % threshold
-N_Frams = 1e4*ones(length(pow_pils), 1);
+N_Frams = [10, 100, 1e3, 1e3, 1e3, 1e4];
 path_file = path_folder + "test_joint_case002" + ".mat";
 
 %% simulations
