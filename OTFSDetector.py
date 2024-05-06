@@ -136,6 +136,7 @@ class OTFSDetector(MatlabFuncHelper):
     MP base (proposed by P. Raviteja in 2017) from Emanuele Viterbo Research Group
     '''
     def detectMPBase(self):
+        # TODO:
         # input check
         if self.No is None or self.No.ndim != 0:
             raise Exception("The noise power must be a scalar.");

@@ -251,7 +251,8 @@ All codes are uniform in matlab and python in three class.
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
 * `Tests`
     * `./Modular_OTFS`: test `OTFS` class
-        * `case001:` test the light mode (integer and fractional Dopplers. ideal and rectangular pulses)
+        * `case000`: modular tests on each functions
+        * `case001:` test the light mode (integer and fractional Dopplers. ideal and rectangular pulses)    
     * `./Modular_OTFSDetector`: test `OTFSResGrid` class
     * `./Modular_OTFSResGrid`: test `OTFSResGrid` class
     * `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
