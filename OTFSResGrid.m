@@ -279,6 +279,7 @@ classdef OTFSResGrid < handle
         %{
         demap
         @isData:        whether give the data
+        @isDataVec:     whether the data is vectorized (default: true)
         @isCE:          whether give the channel estimation result
         @threshold:     the threshold to estimate the channel
         %}
@@ -286,6 +287,7 @@ classdef OTFSResGrid < handle
             % optional inputs - register
             inPar = inputParser;
             addParameter(inPar, 'isData', true, @(x) isscalar(x)&&islogical(x));
+            addParameter(inPar, 'isDataVec', true, @(x) isscalar(x)&&islogical(x));
             addParameter(inPar, 'isCE', true, @(x) isscalar(x)&&islogical(x));
             addParameter(inPar, 'threshold', 0, @(x) isscalar(x)&&isnumeric(x));
             inPar.KeepUnmatched = true;     % Allow unmatched cases
@@ -293,6 +295,7 @@ classdef OTFSResGrid < handle
             parse(inPar, varargin{:});
             % optional inputs - assign
             isData = inPar.Results.isData;
+            isDataVec = inPar.Results.isDataVec;
             isCE = inPar.Results.isCE;
             threshold = inPar.Results.threshold;
             % input check          
@@ -308,7 +311,15 @@ classdef OTFSResGrid < handle
             % y
             y = NaN;
             if isData
-                y = self.getContentNoCE();
+                if self.pilot_type == self.PILOT_TYPE_EM
+                    if isDataVec
+                        y = self.getContentNoCE();
+                    else
+                        y = self.getContentZeroCE();
+                    end
+                elseif self.pilot_type == self.PILOT_TYPE_SP
+                    y = self.getContent("isVector", isDataVec);
+                end
             end
             % Hest
             his = NaN;
@@ -573,7 +584,7 @@ classdef OTFSResGrid < handle
                     error("The guard (pos) on Doppler axis overflows.");
                 end
                 % calculate PG area
-                if self.pilot_type == self.PILOT_TYPE_EM
+                if self.pilot_type == self.PILOT_TYPE_EM || self.pilot_type == self.PILOT_TYPE_SP
                     % PG area only exist when using embedded pilots
                     self.pg_num = (self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos);
                     self.pg_delay_beg = self.pl1 - self.gl_len_neg;
@@ -583,21 +594,23 @@ classdef OTFSResGrid < handle
                 end
                 
                 % calulate channel estimate area
-                if self.gl_len_ful
-                    self.ce_delay_beg = 1;
-                    self.ce_delay_end = self.nSubcarNum;
-                else
-                    self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
-                    self.ce_delay_end = self.pg_delay_end;
+                if self.pilot_type == self.PILOT_TYPE_EM || self.pilot_type == self.PILOT_TYPE_SP
+                    if self.gl_len_ful
+                        self.ce_delay_beg = 1;
+                        self.ce_delay_end = self.nSubcarNum;
+                    else
+                        self.ce_delay_beg = self.pg_delay_beg + self.gl_len_neg;
+                        self.ce_delay_end = self.pg_delay_end;
+                    end
+                    if self.gk_len_ful
+                        self.ce_doppl_beg = 1;
+                        self.ce_doppl_end = self.nTimeslotNum;
+                    else
+                        self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
+                        self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
+                    end
+                    self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
                 end
-                if self.gk_len_ful
-                    self.ce_doppl_beg = 1;
-                    self.ce_doppl_end = self.nTimeslotNum;
-                else
-                    self.ce_doppl_beg = self.pg_doppl_beg + floor(self.gk_len_neg/2);
-                    self.ce_doppl_end = self.pg_doppl_end - floor(self.gk_len_pos/2);
-                end
-                self.ce_num = (self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1);
             end
         end
         

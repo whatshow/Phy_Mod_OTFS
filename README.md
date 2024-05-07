@@ -274,3 +274,5 @@ Before running any sample code, please make sure you are at the root path of thi
 * `OTFS`
     * getCSI(): python need to sort
     * removeNoDAChannel(): need to remove zero padding area
+* `OTFSDetect`
+    * `detectMPBase`: support when batch_size is greater than 1

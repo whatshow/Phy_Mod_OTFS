@@ -193,7 +193,7 @@ class OTFSResGrid(MatlabFuncHelper):
         # calculate PG & CE area
         self.calcAreaPGCE();
         # insert
-        self.insertDA(np.asarray(symbols));
+        self.insertDA(symbols);
         self.insertP(pilots_pow);
         
     '''
@@ -225,10 +225,11 @@ class OTFSResGrid(MatlabFuncHelper):
     '''
     demap
     @isData:        whether give the data
+    @isDataVec:     whether the data is vectorized (default: true)
     @isCE:          whether give the channel estimation result
     @threshold:     the threshold to estimate the channel
     '''
-    def demap(self, *, isData=True, isCE=True, threshold=0):
+    def demap(self, *, isData=True, isDataVec=True, isCE=True, threshold=0):
         # input check          
         # input check - threshold
         if threshold < 0:
@@ -238,7 +239,15 @@ class OTFSResGrid(MatlabFuncHelper):
             raise Exception("The pulse type has to be set before demapping.");
 
         # y
-        y = self.getContentNoCE() if isData else None;
+        y = None;
+        if isData:
+            if self.pilot_type == self.PILOT_TYPE_EM:
+                if isDataVec:
+                    y = self.getContentNoCE();
+                else:
+                    y = self.getContentZeroCE();
+            elif self.pilot_type == self.PILOT_TYPE_SP:
+                    y = self.getContent(isVector=isDataVec);
         his = None;
         lis = None;
         kis = None;
@@ -454,7 +463,7 @@ class OTFSResGrid(MatlabFuncHelper):
             if (self.pk1+self.pk_len-1) + self.gk_len_pos >= self.nTimeslotNum:
                 raise Exception("The guard (pos) on Doppler axis overflows.");
             # calculate PG area
-            if self.pilot_type == self.PILOT_TYPE_EM:
+            if self.pilot_type == self.PILOT_TYPE_EM or self.pilot_type == self.PILOT_TYPE_SP:
                 # PG area only exist when using embedded pilots
                 self.pg_num = ((self.pl_len+self.gl_len_neg+self.gl_len_pos)*(self.pk_len+self.gk_len_neg+self.gk_len_pos)).astype(int);
                 self.pg_delay_beg = (self.pl1 - self.gl_len_neg).astype(int);
@@ -462,25 +471,27 @@ class OTFSResGrid(MatlabFuncHelper):
                 self.pg_doppl_beg = (self.pk1 - self.gk_len_neg).astype(int);
                 self.pg_doppl_end = (self.pk1 + self.pk_len - 1 + self.gk_len_pos).astype(int);
             # calulate channel estimate area
-            if self.gl_len_ful:
-                self.ce_delay_beg = 0;
-                self.ce_delay_end = (self.nSubcarNum - 1).astype(int);
-            else:
-                self.ce_delay_beg = (self.pg_delay_beg + self.gl_len_neg).astype(int);
-                self.ce_delay_end = (self.pg_delay_end).astype(int);
-            if self.gk_len_ful:
-                self.ce_doppl_beg = 0;
-                self.ce_doppl_end = (self.nTimeslotNum - 1).astype(int);
-            else:
-                self.ce_doppl_beg = (self.pg_doppl_beg + floor(self.gk_len_neg/2)).astype(int);
-                self.ce_doppl_end = (self.pg_doppl_end - floor(self.gk_len_pos/2)).astype(int);
-            self.ce_num = ((self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1)).astype(int);
+            if self.pilot_type == self.PILOT_TYPE_EM or self.pilot_type == self.PILOT_TYPE_SP:
+                if self.gl_len_ful:
+                    self.ce_delay_beg = 0;
+                    self.ce_delay_end = (self.nSubcarNum - 1).astype(int);
+                else:
+                    self.ce_delay_beg = (self.pg_delay_beg + self.gl_len_neg).astype(int);
+                    self.ce_delay_end = (self.pg_delay_end).astype(int);
+                if self.gk_len_ful:
+                    self.ce_doppl_beg = 0;
+                    self.ce_doppl_end = (self.nTimeslotNum - 1).astype(int);
+                else:
+                    self.ce_doppl_beg = (self.pg_doppl_beg + floor(self.gk_len_neg/2)).astype(int);
+                    self.ce_doppl_end = (self.pg_doppl_end - floor(self.gk_len_pos/2)).astype(int);
+                self.ce_num = ((self.ce_delay_end - self.ce_delay_beg + 1)*(self.ce_doppl_end - self.ce_doppl_beg + 1)).astype(int);
 
     '''
     insert data
     @symbols: symbols to map a vector
     '''
     def insertDA(self, symbols):
+        symbols = self.squeeze(symbols).copy();
         # input check
         if self.pilot_type == self.PILOT_TYPE_SP:
             data_num = self.nTimeslotNum*self.nSubcarNum - self.zp_len*self.nTimeslotNum;
@@ -502,7 +513,7 @@ class OTFSResGrid(MatlabFuncHelper):
             for doppl_id in range(self.nTimeslotNum):
                 for delay_id in range(self.nSubcarNum):
                     if self.isInAreaDA(doppl_id, delay_id):
-                        if self.isInAreaPG(doppl_id, delay_id):
+                        if self.batch_size == self.BATCH_SIZE_NO:
                             self.content[doppl_id, delay_id] = symbols[symbols_id];
                         else:
                             self.content[..., doppl_id, delay_id] = symbols[..., symbols_id];
