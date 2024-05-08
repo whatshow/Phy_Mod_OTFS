@@ -2,8 +2,8 @@ import os
 import shutil
 
 # version control
-version = "2.1.2";
-install_requires = ['numpy>=1.23.5'];
+version = "2.1.3";
+install_requires = ['numpy>=1.20.1'];
 
 # path
 path_cur = os.getcwd();

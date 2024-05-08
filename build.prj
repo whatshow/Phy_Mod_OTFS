@@ -1,13 +1,13 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration build-checksum="2675168301" file="D:\Projects\Phy_Mod_OTFS\build.prj" location="D:\Projects\Phy_Mod_OTFS" name="build" target="target.toolbox" target-name="Package Toolbox">
+  <configuration build-checksum="2675168301" file="D:\Projects\Github_Whatshow\Phy_Mod_OTFS\build.prj" location="D:\Projects\Github_Whatshow\Phy_Mod_OTFS" name="build" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>whatshow_phy_mod_otfs</param.appname>
-    <param.authnamewatermark />
-    <param.email />
+    <param.authnamewatermark>whatshow</param.authnamewatermark>
+    <param.email>wfwfpwefe2323@gmail.com</param.email>
     <param.company />
     <param.summary>OTFS Modulation</param.summary>
     <param.description>This repository is a fundamental toolbox of OTFS modulation crossing matlab and python. Please check the project on Github for how to use.</param.description>
     <param.screenshot />
-    <param.version>2.1.2</param.version>
+    <param.version>2.1.3</param.version>
     <param.output>${PROJECT_ROOT}\whatshow_phy_mod_otfs.mltbx</param.output>
     <param.products.name />
     <param.products.id />
@@ -127,11 +127,11 @@ init.m
     </fileset.depfun.excluded>
     <fileset.package />
     <build-deliverables>
-      <file location="${PROJECT_ROOT}" name="whatshow_phy_mod_otfs.mltbx" optional="false">D:\Projects\Phy_Mod_OTFS\whatshow_phy_mod_otfs.mltbx</file>
+      <file location="${PROJECT_ROOT}" name="whatshow_phy_mod_otfs.mltbx" optional="false">D:\Projects\Github_Whatshow\Phy_Mod_OTFS\whatshow_phy_mod_otfs.mltbx</file>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>E:\MATLAB\R2023a</root>
+      <root>C:\Program Files\MATLAB\R2023a</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
