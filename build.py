@@ -2,8 +2,7 @@ import os
 import shutil
 
 # version control
-version = "2.1.3";
-install_requires = ['numpy>=1.20.1'];
+version = "2.1.4";
 
 # path
 path_cur = os.getcwd();
@@ -26,7 +25,6 @@ setup(\n\
       name="whatshow_phy_mod_otfs",\n\
       version="{version}",\n\
       packages=find_packages(),\n\
-      install_requires={install_requires},\n\
       long_description = description,\n\
       long_description_content_type = \"text/markdown\"\n\
 );';

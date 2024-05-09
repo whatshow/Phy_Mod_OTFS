@@ -74,7 +74,7 @@ class OTFS(MatlabFuncHelper):
     @isFast:    DD domain -> TD domain (no X_TF) 
     '''
     def modulate(self, in1, *, isFast=True):
-        if isinstance(in1, OTFSResGrid):
+        if isinstance(in1, OTFSResGrid) or str(type(in1))=="<class 'whatshow_phy_mod_otfs.OTFSResGrid.OTFSResGrid'>":
             # load RG
             self.nSubcarNum, self.nTimeslotNum = in1.getContentSize();
             self.calcRes();
