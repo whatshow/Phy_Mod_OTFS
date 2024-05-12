@@ -451,26 +451,26 @@ class OTFS(MatlabFuncHelper):
         pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end = self.rg.getAreaPG();
         ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end = self.rg.getAreaCE();
         # mark redundant values - columns (PG area)
+        col_ids = [];
         if pg_num > 0:
             for doppl_id in range(pg_doppl_beg, pg_doppl_end+1):
                 for delay_id in range(pg_delay_beg, pg_delay_end+1):
                     col_id = doppl_id*self.nSubcarNum + delay_id;
+                    col_ids.append(col_id);
                     H_DD[..., :, col_id] = nans;
         # mark redundant values - rows (CE area)
+        row_ids = [];
         if ce_num > 0:
             for doppl_id in range(ce_doppl_beg,ce_doppl_end+1):
                 for delay_id in range(ce_delay_beg,ce_delay_end+1):
                     row_id = doppl_id*self.nSubcarNum + delay_id;
+                    row_ids.append(row_id);
                     H_DD[..., row_id, :] = nans;
         # remove
         # remove - columns
-        if pg_num > 0:
-            col_idx = self.sum(self.isnan(H_DD)) == self.sig_len;
-            H_DD = np.delete(H_DD, col_idx, axis=-1);
+        H_DD = np.delete(H_DD, col_ids, axis=-1);
         # remove - rows
-        if ce_num > 0:
-            row_idx = self.sum(self.isnan(H_DD), axis=-1) == (self.sig_len - pg_num);
-            H_DD = np.delete(H_DD, row_idx, axis=-2);
+        H_DD = np.delete(H_DD, row_ids, axis=-2);
         return H_DD;
     
     '''
@@ -490,13 +490,13 @@ class OTFS(MatlabFuncHelper):
             for k in range(self.nTimeslotNum):
                     for tap_id in range(p):
                         if self.batch_size == self.BATCH_SIZE_NO:
-                            hi = self.chan_coef[tap_id];
-                            li = self.delay_taps[tap_id];
-                            ki = self.doppler_taps[tap_id];
+                            hi = his[tap_id];
+                            li = lis[tap_id];
+                            ki = kis[tap_id];
                         else:
-                            hi = np.expand_dims(self.chan_coef[..., tap_id], axis=-1);
-                            li = np.expand_dims(self.delay_taps[..., tap_id], axis=-1);
-                            ki = np.expand_dims(self.doppler_taps[..., tap_id], axis=-1);
+                            hi = np.expand_dims(his[..., tap_id], axis=-1);
+                            li = np.expand_dims(lis[..., tap_id], axis=-1);
+                            ki = np.expand_dims(kis[..., tap_id], axis=-1);
                         hw_add = 1/self.sig_len*hi*np.exp(-2j*np.pi*li*ki/self.sig_len)* \
                                 np.expand_dims(np.sum(np.exp(2j*np.pi*(l-li)*self.seq(self.nSubcarNum)/self.nSubcarNum), axis=-1), axis=-1)* \
                                 np.expand_dims(np.sum(np.exp(-2j*np.pi*(k-ki)*self.seq(self.nTimeslotNum)/self.nTimeslotNum), axis=-1), axis=-1);
