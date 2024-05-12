@@ -170,7 +170,8 @@ class OTFS(MatlabFuncHelper):
             taps_selected_idx = self.shufSelectTopNIdx(taps_max, p);
             # CSI - delay
             self.delay_taps = np.take(l_combs, taps_selected_idx);
-            self.delay_taps[..., np.argmin(self.delay_taps, -1)] = 0;
+            lis_min_idx = np.argmin(self.delay_taps, -1, keepdims=True);
+            np.put_along_axis(self.delay_taps, lis_min_idx, 0, axis=-1);
             # CSI - doppler
             self.doppler_taps = np.take(k_combs, taps_selected_idx);
             # add fractional Doppler
@@ -238,7 +239,7 @@ class OTFS(MatlabFuncHelper):
         s_chan = 0;
         if self.pulse_type == self.PULSE_IDEAL:
             H_DD = self.buildIdealChannel(self.taps_num, self.chan_coef, self.delay_taps, self.doppler_taps);
-            s_chan = H_DD @ self.reshape(self.X_DD, self.sig_len, 1);
+            s_chan = self.squeeze(H_DD @ self.reshape(self.X_DD, self.sig_len, 1));
         elif self.pulse_type == self.PULSE_RECTA:
             s_cp, s_cp_t = self.addCP();
             for tap_id in range(self.taps_num):
