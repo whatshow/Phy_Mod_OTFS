@@ -2,7 +2,11 @@ import numpy as np
 from numpy import floor, sqrt, kron
 from numpy.fft import fft, ifft
 from whatshow_toolbox import MatlabFuncHelper
-from OTFSResGrid import OTFSResGrid
+if '.' not in __name__ :
+    from OTFSResGrid import OTFSResGrid
+else:
+    from .OTFSResGrid import OTFSResGrid
+
 eps = np.finfo(float).eps;
 
 class OTFS(MatlabFuncHelper):
@@ -74,7 +78,7 @@ class OTFS(MatlabFuncHelper):
     @isFast:    DD domain -> TD domain (no X_TF) 
     '''
     def modulate(self, in1, *, isFast=True):
-        if isinstance(in1, OTFSResGrid) or str(type(in1))=="<class 'whatshow_phy_mod_otfs.OTFSResGrid.OTFSResGrid'>":
+        if isinstance(in1, OTFSResGrid):
             # load RG
             self.nSubcarNum, self.nTimeslotNum = in1.getContentSize();
             self.calcRes();

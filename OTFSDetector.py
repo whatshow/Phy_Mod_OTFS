@@ -1,6 +1,10 @@
 import numpy as np
 from whatshow_toolbox import MatlabFuncHelper
-from OTFSResGrid import OTFSResGrid
+if '.' not in __name__ :
+    from OTFSResGrid import OTFSResGrid
+else:
+    from .OTFSResGrid import OTFSResGrid
+
 # constants
 pi = np.pi;
 

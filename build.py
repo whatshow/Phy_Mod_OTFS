@@ -2,7 +2,7 @@ import os
 import shutil
 
 # version control
-version = "2.1.4";
+version = "2.1.5";
 
 # path
 path_cur = os.getcwd();
@@ -44,8 +44,7 @@ for file in files:
 
 # add config files
 # __init__.py
-with open(path_dist_pkg + file_init, "w") as init:
-    init.write(file_init_content);
+shutil.copyfile(file_init, path_dist_pkg + file_init);
 # setup.py
 with open(path_dist + file_setup, "w") as setup:
     setup.write(file_setup_content);
