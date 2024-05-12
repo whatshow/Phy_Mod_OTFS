@@ -96,7 +96,7 @@ for i in range(case_num):
     rg_rx = otfs.demodulate();
     _, his_est, lis_est, kis_est = rg_rx.demap(threshold=1e-10);
     HDD_est = otfs.getChannel(his=his_est, lis=lis_est, kis=kis_est, data_only=False);
-    HDD_diff = abs(HDD - HDD_est);
+    
     # reget xDD and yDD
     if batch_size is None:
         xDD_all = rg.getContent(isVector=True);
@@ -109,8 +109,25 @@ for i in range(case_num):
     else:
         yDD_diff = abs(yDD_all - np.squeeze(HDD@xDD_all, axis=-1));
     if batch_size is None:
-        assert(np.sum(HDD_diff)/M/N > 1e-13);
         assert(np.sum(yDD_diff)/M/N < 1e-13);
     else:
-        assert(np.sum(HDD_diff)/M/N/batch_size > 1e-13);
         assert(np.sum(yDD_diff)/M/N/batch_size < 1e-13);
+    # channel estimation check
+    Y_DD = rg_rx.getContent();
+    if batch_size is None:
+        for pid in range(len(his)):
+            hi = his_est[pid];
+            li = int(lis_est[pid]);
+            ki = int(kis_est[pid]);
+                
+            residual = Y_DD[rg.pk1+ki, rg.pl1+li] - hi*(1+1j)*np.sqrt(pil_pow/2)*np.exp(-2j*np.pi*li*ki/M/N);
+            assert(abs(residual) < 1e-13);
+    else:
+        for batch_id in range(batch_size):
+            for pid in range(len(his[batch_id,:])):
+                hi = his_est[batch_id, pid];
+                li = int(lis_est[batch_id, pid]);
+                ki = int(kis_est[batch_id, pid]);
+                residual = Y_DD[batch_id, rg.pk1+ki, rg.pl1+li] - hi*(1+1j)*np.sqrt(pil_pow/2)*np.exp(-2j*np.pi*li*ki/M/N);
+                assert(abs(residual) < 1e-13);
+    
