@@ -540,7 +540,7 @@ class OTFSResGrid(MatlabFuncHelper):
         if self.p_len == 0:
             self.p_len = self.pl_len*self.pk_len;
             if self.p_len > 0:
-                self.pilots = sqrt(pilots_pow/2)*(1+1j)/np.sqrt(2)*np.ones(self.p_len);
+                self.pilots = sqrt(pilots_pow/2)*(1+1j)*np.ones(self.p_len);
         # allocate pilots
         if self.p_len != 0:
             # allocate pilots

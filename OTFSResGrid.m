@@ -674,7 +674,7 @@ classdef OTFSResGrid < handle
             if self.p_len == 0
                 self.p_len = self.pl_len*self.pk_len;
                 if self.p_len > 0
-                    self.pilots = sqrt(pilots_pow/2)*(1+1j)/sqrt(2)*ones(self.p_len, 1);
+                    self.pilots = sqrt(pilots_pow/2)*(1+1j)*ones(self.p_len, 1);
                 end
             end
             % allocate pilots
