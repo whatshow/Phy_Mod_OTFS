@@ -53,7 +53,7 @@ for i in range(case_num):
     HDD = otfs.getChannel();
     rg_rx = otfs.demodulate();
     yDD, his_est, lis_est, kis_est = rg_rx.demap(threshold=1e-10);
-    HDD_est = otfs.getChannel(his=his_est, lis=lis_est, kis=kis_est);
+    HDD_est = otfs.getChannel(his_est, lis_est, kis_est);
     HDD_diff = abs(HDD - HDD_est);
     if batch_size is None:
         yDD_diff = abs(yDD - HDD@xDD);
@@ -95,7 +95,7 @@ for i in range(case_num):
     HDD = otfs.getChannel(data_only=False);
     rg_rx = otfs.demodulate();
     _, his_est, lis_est, kis_est = rg_rx.demap(threshold=1e-10);
-    HDD_est = otfs.getChannel(his=his_est, lis=lis_est, kis=kis_est, data_only=False);
+    HDD_est = otfs.getChannel(his_est, lis_est, kis_est, data_only=False);
     
     # reget xDD and yDD
     if batch_size is None:
