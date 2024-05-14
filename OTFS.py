@@ -305,22 +305,23 @@ class OTFS(MatlabFuncHelper):
     @kis:   the channel Dopplers
     @data_only: whether the channel is only for data (by default true). If you want to get the entire H_DD when using pilos and/or guards, you should manullay set it to false.
     '''
-    def getChannel(self, *, his=None, lis=None, kis=None, data_only=True):
+    def getChannel(self, *args, data_only=True):
         # input check & init
-        if his is not None:
-            his = np.asarray(his);
-            lis = np.asarray(lis);
-            kis = np.asarray(kis);
-            if not self.isvector(his) and not self.isvector(lis) and not self.isvector(kis):
-                raise Exception("The input CSI must be vectors.");
-            p = his.shape[-1];
-            if p != lis.shape[-1] and p != kis.shape[-1]:
-                raise Exception("The input CSI (gains, delays and dopplers) must have the same length.");
-        else:
-            p = self.taps_num;
-            his = self.chan_coef;
-            lis = self.delay_taps;
-            kis = self.doppler_taps;
+        p = self.taps_num;
+        his = self.chan_coef;
+        lis = self.delay_taps;
+        kis = self.doppler_taps;
+        if len(args) > 0:
+            if len(args) >= 3:
+                his = np.asarray(args[0]);
+                lis = np.asarray(args[1]);
+                kis = np.asarray(args[2]); 
+                if not self.isvector(his) and not self.isvector(lis) and not self.isvector(kis):
+                    raise Exception("The input CSI must be vectors.");
+                p = his.shape[-1];
+                if p != lis.shape[-1] and p != kis.shape[-1]:
+                    raise Exception("The input CSI (gains, delays and dopplers) must have the same length.");
+           
         # build the channel
         if self.pulse_type == self.PULSE_IDEAL:
             H_DD = self.buildIdealChannel(p, his, lis, kis);
