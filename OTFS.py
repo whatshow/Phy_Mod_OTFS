@@ -530,14 +530,14 @@ class OTFS(MatlabFuncHelper):
         # accumulate all paths
         for tap_id in range(p):
             if self.batch_size == self.BATCH_SIZE_NO:
-                hi = self.chan_coef[tap_id];
-                li = self.delay_taps[tap_id];
-                ki = self.doppler_taps[tap_id];
+                hi = his[tap_id];
+                li = lis[tap_id];
+                ki = kis[tap_id];
                 
             else:
-                hi = self.chan_coef[..., tap_id];
-                li = self.delay_taps[..., tap_id];
-                ki = np.expand_dims(self.doppler_taps[..., tap_id], axis=-1);
+                hi = his[..., tap_id];
+                li = lis[..., tap_id];
+                ki = np.expand_dims(kis[..., tap_id], axis=-1);
             # delay
             piMati = self.circshift(piMat, li);
             # Doppler            

@@ -30,20 +30,14 @@ class OTFSChannel(MatlabFuncHelper):
     def HisMat2CSI(self, his, lis, kis):
         pass
     
-            
     ###########################################################################
-    # private methods
-    '''
-    shuffle and select top n elements' indices 
-    '''
-    def shufSelectTopNIdx(self, taps_max, p):
-        if self.batch_size == self.BATCH_SIZE_NO:
-            taps_idx_chaotic = np.random.permutation(taps_max);
-            taps_selected_idx = np.take(taps_idx_chaotic, np.arange(p));
-        else:
-            taps_selected_idx = np.zeros((self.batch_size, p)).astype(int);
-            for batch_id in range(self.batch_size):
-                taps_idx_chaotic = np.random.permutation(taps_max);
-                taps_selected_idx[batch_id, :] = np.take(taps_idx_chaotic, np.arange(p));
-        return taps_selected_idx;
+    # obsolete methods
+    def obsCSIList2Mat(his, lis, kis, lmax, kmin, kmax):
+        pass
+    
+    def obsCSIMat2List(his_mat, lmax, kmin, kmax):
+        his = [];
+        lis = [];
+        kis = [];
         
+        return his, lis, kis;
