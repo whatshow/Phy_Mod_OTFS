@@ -449,7 +449,6 @@ class OTFS(MatlabFuncHelper):
             raise Exception("The resource grid is not given.");
         
         #TODO: remove zero padding area
-        nans = self.nan(self.sig_len);
         pg_num, pg_delay_beg, pg_delay_end, pg_doppl_beg, pg_doppl_end = self.rg.getAreaPG();
         ce_num, ce_delay_beg, ce_delay_end, ce_doppl_beg, ce_doppl_end = self.rg.getAreaCE();
         # mark redundant values - columns (PG area)
@@ -459,7 +458,6 @@ class OTFS(MatlabFuncHelper):
                 for delay_id in range(pg_delay_beg, pg_delay_end+1):
                     col_id = doppl_id*self.nSubcarNum + delay_id;
                     col_ids.append(col_id);
-                    H_DD[..., :, col_id] = nans;
         # mark redundant values - rows (CE area)
         row_ids = [];
         if ce_num > 0:
@@ -467,7 +465,6 @@ class OTFS(MatlabFuncHelper):
                 for delay_id in range(ce_delay_beg,ce_delay_end+1):
                     row_id = doppl_id*self.nSubcarNum + delay_id;
                     row_ids.append(row_id);
-                    H_DD[..., row_id, :] = nans;
         # remove
         # remove - columns
         H_DD = np.delete(H_DD, col_ids, axis=-1);
