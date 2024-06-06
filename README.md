@@ -2,10 +2,6 @@
 [![PyPi](https://img.shields.io/badge/PyPi-2.1.11-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.11-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
 
 This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`. **If you use our work, you should use the following citation to refer it**:
-> Raviteja, P., Phan, K. T., Hong, Y., & Viterbo, E. (2018). Interference cancellation and iterative detection for orthogonal time frequency space modulation. *IEEE transactions on wireless communications, 17(10)*, 6501-6515.
-
-> Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
-
 > X. Qu, A. Kosasih, W. Hardjawana, V. Onasis and B. Vucetic, "Bayesian-based Symbol Detector for Orthogonal Time Frequency Space Modulation Systems," *2021 IEEE 32nd Annual International Symposium on Personal, Indoor and Mobile Radio Communications (PIMRC)*, Helsinki, Finland, 2021, pp. 1154-1159, doi: 10.1109/PIMRC50174.2021.9569353.
 
 > A. Kosasih, X. Qu, W. Hardjawana, C. Yue and B. Vucetic, "Bayesian Neural Network Detector for an Orthogonal Time Frequency Space Modulation," in *IEEE Wireless Communications Letters*, vol. 11, no. 12, pp. 2570-2574, Dec. 2022, doi: 10.1109/LWC.2022.3209076.
@@ -282,3 +278,8 @@ Before running any sample code, please make sure you are at the root path of thi
     * removeNoDAChannel(): need to remove zero padding area
 * `OTFSDetect`
     * `detectMPBase`: support when batch_size is greater than 1
+
+## References
+> Raviteja, P., Phan, K. T., Hong, Y., & Viterbo, E. (2018). Interference cancellation and iterative detection for orthogonal time frequency space modulation. *IEEE transactions on wireless communications, 17(10)*, 6501-6515.
+
+> Raviteja, P., Phan, K. T., & Hong, Y. (2019). Embedded pilot-aided channel estimation for OTFS in delay–Doppler channels. *IEEE transactions on vehicular technology, 68(5)*, 4906-4917.
