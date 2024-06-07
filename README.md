@@ -1,5 +1,5 @@
 # OTFS Modulation
-[![PyPi](https://img.shields.io/badge/PyPi-2.1.11-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.11-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
+[![Github](https://img.shields.io/badge/Github-2.1.12-grey)](https://github.com/whatshow/Phy_Mod_OTFS) [![PyPi](https://img.shields.io/badge/PyPi-2.1.12-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.12-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
 
 This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`. **If you use our work, you should use the following citation to refer it**:
 > X. Qu, A. Kosasih, W. Hardjawana, V. Onasis and B. Vucetic, "Bayesian-based Symbol Detector for Orthogonal Time Frequency Space Modulation Systems," *2021 IEEE 32nd Annual International Symposium on Personal, Indoor and Mobile Radio Communications (PIMRC)*, Helsinki, Finland, 2021, pp. 1154-1159, doi: 10.1109/PIMRC50174.2021.9569353.
@@ -124,6 +124,7 @@ All codes are uniform in matlab and python in three class.
         rg.isPulseIdeal();  // use ideal pulse or not
         rg.isPulseRecta();  // use rectangula pulse or not
         ```
+    * getPilotsMat(): return a DD domain matrix only containing pilots
     * setContent()
         `@content`: a 2D matrix containing pilots, guards and data (if used)
         ```c, matlab, python
@@ -146,6 +147,7 @@ All codes are uniform in matlab and python in three class.
     * getContentNoCE(): get the content except CE area (return a vector)
     * getContentZeroPG(): get the content of zero PG area (return a vector)
     * getContentZeroCE(): get the content of zero CE area (return a vector)
+    * getContentDataLocsMat(): get Data locations in content (return a logical matrix)
 * OTFS: this class provides the entire process of OTFS from Tx to Rx
     * OTFS()<br>
         `@batch_size(opt)`: the batch size (only used in python)
@@ -251,26 +253,28 @@ All codes are uniform in matlab and python in three class.
     
 ## Samples
 Before running any sample code, please make sure you are at the root path of this repository. Also, Matlab codes require running `init` in the command window first to load directories.
-* `Tests`
-    * `./Modular_OTFS`: test `OTFS` class
-        * `case000`: modular tests on each functions
-        * `case001:` test the light mode (integer and fractional Dopplers. ideal and rectangular pulses)    
-    * `./Modular_OTFSDetector`: test `OTFSResGrid` class
-    * `./Modular_OTFSResGrid`: test `OTFSResGrid` class
-    * `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
-    * `./Whole_CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
-    * `./Whole_Joint`
-        * `case001`: ideal/recta pulse + full guards + single pilot; NMSE
-        * `case002`: ideal/recta pulse + full guards + single pilot; SER(mp base)
-    <!--* `test_ce_getcsi`: test `getCSI()` using `sort`-->
-    <!--* `test_ce_detect_*`: test channel estimation and detection together-->
-    <!--* `test_ch_*`: test the channel functions for `OTFS`-->
-    <!--* `test_detect_mp`: test MP detection methods-->
-    <!--* `test_wf` & `test_wf_*`: test waveforms-->
-<!--* TestFractionalDoppler-->
+
 * `Viterbo_MP_2018`: this code is from `Emanuele Viterbo`. You can download his original code in [this page](https://ecse.monash.edu/staff/eviterbo/OTFS-VTC18/index.html).
 * `Viterbo_MP_Embed`: examples showing how MP detects symbols using embedded pilots.
 * `WaveForm`: this is to observe the waveform of OTFS.
+
+## Tests
+<!--* `test_ce_getcsi`: test `getCSI()` using `sort`-->
+<!--* `test_ce_detect_*`: test channel estimation and detection together-->
+<!--* `test_ch_*`: test the channel functions for `OTFS`-->
+<!--* `test_detect_mp`: test MP detection methods-->
+<!--* `test_wf` & `test_wf_*`: test waveforms-->
+<!--* TestFractionalDoppler-->
+* `./Modular_OTFS`: test `OTFS` class
+    * `case000`: modular tests on each functions
+    * `case001:` test the light mode (integer and fractional Dopplers. ideal and rectangular pulses)    
+* `./Modular_OTFSDetector`: test `OTFSResGrid` class
+* `./Modular_OTFSResGrid`: test `OTFSResGrid` class
+* `./Whole_CE`: examples showing how to estimate channel (using **OTFSResourceGrid**). 
+* `./Whole_CE_Detect`: examples showing how to estimate channel (using **OTFSResourceGrid**) and detect symbols. 
+* `./Whole_Joint`
+    * `case001`: ideal/recta pulse + full guards + single pilot; NMSE
+    * `case002`: ideal/recta pulse + full guards + single pilot; SER(mp base)
 
 ## TODO
 * `OTFS`

@@ -319,7 +319,9 @@ class OTFS(MatlabFuncHelper):
                 if not self.isvector(his) and not self.isvector(lis) and not self.isvector(kis):
                     raise Exception("The input CSI must be vectors.");
                 p = his.shape[-1];
-                if p != lis.shape[-1] and p != kis.shape[-1]:
+                if p == 0:
+                    raise Exception("The input CSI is empty.");
+                elif p != lis.shape[-1] and p != kis.shape[-1]:
                     raise Exception("The input CSI (gains, delays and dopplers) must have the same length.");
            
         # build the channel

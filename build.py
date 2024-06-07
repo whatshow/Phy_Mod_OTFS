@@ -2,7 +2,7 @@ import os
 import shutil
 
 # version control
-version = "2.1.11";
+version = "2.1.12";
 
 # path
 path_cur = os.getcwd();
@@ -54,9 +54,10 @@ description_pypi = "";
 with open(file_readme, "r") as readme:
     description = readme.read(); 
     txt_1_start = description.find("## How to install");
-    txt_2_start = description.find("## How to use");
-    txt_3_start = description.find("## Samples");
-    description_pypi = description[:txt_1_start] + description[txt_2_start:txt_3_start];
+    # txt_2_start = description.find("## How to use");
+    # txt_3_start = description.find("## Samples");
+    # description_pypi = description[:txt_1_start] + description[txt_2_start:txt_3_start];
+    description_pypi = description[:txt_1_start];
 with open(path_dist + file_readme, "w") as readme_pypi:
     readme_pypi.write(description_pypi);
 

@@ -431,6 +431,14 @@ classdef OTFSResGrid < handle
         function is_pulse_type = isPulseRecta(self)
             is_pulse_type = self.pulse_type == self.PULSE_RECTA;
         end
+
+        %{
+        get the pilots matrix
+        %}
+        function Xp = getPilotsMat(self)
+            Xp = zeros(self.nTimeslotNum, self.nSubcarNum);
+            Xp(self.pk1:self.pk1+self.pk_len-1, self.pl1:self.pl1+self.pl_len-1) = reshape(self.pilots, self.pl_len, self.pk_len).';
+        end
         
         %{
         set content
@@ -536,6 +544,18 @@ classdef OTFSResGrid < handle
                             data(doppl_id, delay_id) = 0;
                         end
                     end
+                end
+            end
+        end
+
+        %{
+        get content - Data locations
+        %}
+        function XdLocs = getContentDataLocsMat(self)
+            XdLocs = true(self.nTimeslotNum, self.nSubcarNum);
+            if self.pilot_type == self.PILOT_TYPE_EM
+                if self.pg_num > 0
+                    XdLocs(self.pg_doppl_beg:self.pg_doppl_end, self.pg_delay_beg:self.pg_delay_end) = false;
                 end
             end
         end

@@ -356,7 +356,9 @@ classdef OTFS < handle
                     lis = varargin{2};
                     kis = varargin{3};
                     p = length(his);
-                    if p ~= length(lis) && p ~= length(kis)
+                    if p == 0
+                        error("The input CSI is empty.");
+                    elseif p ~= length(lis) && p ~= length(kis)
                         error("The input CSI (gains, delays and dopplers) must have the same length.");
                     end
                 end
