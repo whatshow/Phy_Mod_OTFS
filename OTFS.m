@@ -336,6 +336,78 @@ classdef OTFS < handle
     % Getters & Setters
     methods
         %{
+        build Phi - the channel estimation matrix
+        @X:     the Tx matrix in DD domain ([batch_size], doppler, delay)
+        @lmax:  the maximal delay
+        @kmax:  the maximal Doppler
+        %}
+        function Phi = buildPhi(self, X, lmax, kmax)
+            pmax = (lmax+1)*(2*kmax+1);                 % the number of all possible paths
+            lis = kron(0:lmax, ones(1, 2*kmax + 1));    % the delays on all possible paths
+            kis = repmat(-kmax:kmax, 1, lmax+1);        % the dopplers on all possible paths
+            Phi = zeros(self.sig_len, pmax);            % the return matrix
+            for yk = 1:self.nTimeslotNum
+                for yl = 1:self.nSubcarNum
+                    Phi_ri = (yk - 1)*self.nSubcarNum + yl;      % row id in Phi
+                    for p_id = 1:pmax
+                        % path delay and doppler
+                        li = lis(p_id);
+                        ki = kis(p_id);
+                        % x(k, l)_
+                        xl = yl - li;
+                        if yl-1 < li
+                            xl = xl + self.nSubcarNum;
+                        end
+                        xk = mod(yk - 1 - ki, self.nTimeslotNum) + 1;
+                        % exponential part (pss_beta)
+                        if self.pulse_type == self.PULSE_IDEAL
+                            pss_beta = exp(-2j*pi*li*ki/self.nSubcarNum/self.nTimeslotNum);
+                        elseif self.pulse_type == self.PULSE_RECTA
+                            pss_beta = exp(2j*pi*(yl - li - 1)*ki/self.nSubcarNum/self.nTimeslotNum); % here, you must use `yl-li-1` instead of `xl-1` or there will be an error
+                            if yl-1 < li
+                                pss_beta = pss_beta*exp(-2j*pi*(xk-1)/self.nTimeslotNum);
+                            end
+                        end
+                        % assign value
+                        Phi(Phi_ri, p_id) = X(xk, xl)*pss_beta;
+                    end
+                end
+            end  
+        end
+
+        %{
+        build Hdd
+        @his: the path gains
+        @lmax:  the maximal delay
+        @kmax:  the maximal Doppler
+        @thres(opt): the threshold of a path (default 0)
+        %}
+        function Hdd = buildHdd(self, his, lmax, kmax, varargin)
+            % register optional inputs 
+            inPar = inputParser;
+            addParameter(inPar,"thres", 0, @(x) isscalar(x)&isnumeric(x));
+            inPar.KeepUnmatched = true;
+            inPar.CaseSensitive = false;
+            parse(inPar, varargin{:});
+            thres = inPar.Results.thres;
+            % other inputs
+            pmax = (lmax+1)*(2*kmax+1);                 % the number of all possible paths
+            lis = kron(0:lmax, ones(1, 2*kmax + 1));    % the delays on all possible paths
+            kis = repmat(-kmax:kmax, 1, lmax+1);        % the dopplers on all possible paths
+            % filter the path gains
+            his(abs(his) < abs(thres)) = 0;
+            % build the channel in DD domain
+            switch self.pulse_type
+                case self.PULSE_IDEAL
+                    Hdd = self.buildIdealChannel(pmax, his, lis, kis);
+                case self.PULSE_RECTA
+                    Hdd = self.buildRectaChannel(pmax, his, lis, kis);
+                otherwise
+                    error("The pulse type is not recognised.");
+            end
+        end
+
+        %{
         Get the channel matrix in Delay Doppler Domain
         @his:   the channel gains
         @lis:   the channel delays
