@@ -2,7 +2,7 @@ import os
 import shutil
 
 # version control
-version = "2.1.12";
+version = "2.1.13";
 
 # path
 path_cur = os.getcwd();

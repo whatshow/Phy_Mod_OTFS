@@ -342,7 +342,7 @@ class OTFSResGrid(MatlabFuncHelper):
     get the pilots matrix
     '''
     def getPilotsMat(self):
-        Xp = self.zeros(self.nTimeslotNum, self.nSubcarNum);
+        Xp = self.zeros(self.nTimeslotNum, self.nSubcarNum).astype(complex);
         if self.batch_size == self.BATCH_SIZE_NO:
             Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.reshape(self.pilots, self.pk_len, self.pl_len);
         else:
