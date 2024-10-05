@@ -350,7 +350,7 @@ class OTFSResGrid(MatlabFuncHelper):
         #     pilots = np.tile(np.reshape(self.pilots, (self.pk_len, self.pl_len)), (self.batch_size, 1, 1));
         #     Xp[..., self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = pilots;
         Xp = np.zeros((self.nTimeslotNum, self.nSubcarNum)).astype(complex);
-        Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.reshape(self.pilots, self.pk_len, self.pl_len);
+        Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = np.reshape(self.pilots, (self.pk_len, self.pl_len));
         return Xp;
     
     '''
