@@ -1,5 +1,5 @@
 # OTFS Modulation
-[![Github](https://img.shields.io/badge/Github-2.1.13-grey)](https://github.com/whatshow/Phy_Mod_OTFS) [![PyPi](https://img.shields.io/badge/PyPi-2.1.13-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.13-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
+[![Github](https://img.shields.io/badge/Github-2.1.14-grey)](https://github.com/whatshow/Phy_Mod_OTFS) [![PyPi](https://img.shields.io/badge/PyPi-2.1.14-blue)](https://pypi.org/project/whatshow-phy-mod-otfs/) [![MathWorks](https://img.shields.io/badge/MathWorks-2.1.14-red)](https://mathworks.com/matlabcentral/fileexchange/161136-whatshow_phy_mod_otfs)
 
 This repository is a fundamental toolbox of OTFS modulation crossing `matlab` and `python`. **If you use our work, you should use the following citation to refer it**:
 > X. Qu, A. Kosasih, W. Hardjawana, V. Onasis and B. Vucetic, "Bayesian-based Symbol Detector for Orthogonal Time Frequency Space Modulation Systems," *2021 IEEE 32nd Annual International Symposium on Personal, Indoor and Mobile Radio Communications (PIMRC)*, Helsinki, Finland, 2021, pp. 1154-1159, doi: 10.1109/PIMRC50174.2021.9569353.

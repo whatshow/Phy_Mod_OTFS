@@ -7,7 +7,7 @@
     <param.summary>OTFS Modulation</param.summary>
     <param.description>This repository is a fundamental toolbox of OTFS modulation crossing matlab and python. Please check the project on Github for how to use.</param.description>
     <param.screenshot />
-    <param.version>2.1.13</param.version>
+    <param.version>2.1.14</param.version>
     <param.output>${PROJECT_ROOT}\whatshow_phy_mod_otfs.mltbx</param.output>
     <param.products.name />
     <param.products.id />

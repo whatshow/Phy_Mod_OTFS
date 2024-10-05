@@ -342,12 +342,15 @@ class OTFSResGrid(MatlabFuncHelper):
     get the pilots matrix
     '''
     def getPilotsMat(self):
-        Xp = self.zeros(self.nTimeslotNum, self.nSubcarNum).astype(complex);
-        if self.batch_size == self.BATCH_SIZE_NO:
-            Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.reshape(self.pilots, self.pk_len, self.pl_len);
-        else:
-            pilots = np.tile(np.reshape(self.pilots, (self.pk_len, self.pl_len)), (self.batch_size, 1, 1));
-            Xp[..., self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = pilots;
+        # build the batch size data (obsolete)
+        # Xp = self.zeros(self.nTimeslotNum, self.nSubcarNum).astype(complex);
+        # if self.batch_size == self.BATCH_SIZE_NO:
+        #     Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.reshape(self.pilots, self.pk_len, self.pl_len);
+        # else:
+        #     pilots = np.tile(np.reshape(self.pilots, (self.pk_len, self.pl_len)), (self.batch_size, 1, 1));
+        #     Xp[..., self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = pilots;
+        Xp = np.zeros((self.nTimeslotNum, self.nSubcarNum)).astype(complex);
+        Xp[self.pk1:self.pk1+self.pk_len, self.pl1:self.pl1+self.pl_len] = self.reshape(self.pilots, self.pk_len, self.pl_len);
         return Xp;
     
     '''
@@ -447,10 +450,10 @@ class OTFSResGrid(MatlabFuncHelper):
     get content - Data locations
     '''
     def getContentDataLocsMat(self):
-        XdLocs = self.ones(self.nTimeslotNum, self.nSubcarNum).astype(bool);
+        XdLocs = np.ones((self.nTimeslotNum, self.nSubcarNum)).astype(bool);
         if self.pilot_type == self.PILOT_TYPE_EM:
             if self.pg_num > 0:
-                XdLocs[..., self.pg_doppl_beg:self.pg_doppl_end+1, self.pg_delay_beg:self.pg_delay_end+1] = False;
+                XdLocs[self.pg_doppl_beg:self.pg_doppl_end+1, self.pg_delay_beg:self.pg_delay_end+1] = False;
         return XdLocs;
         
     ###########################################################################
